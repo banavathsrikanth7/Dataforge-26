@@ -145,22 +145,25 @@ python -m http.server 8000
 The concept is not analogous to BDH's mechanism — the fast-weight / linear-attention
 state **is** the mechanism in BDH-GPU's formulation. §6:
 
-- states plainly that BDH-GPU builds keys/values from **ReLU-low-rank**
-  transformations of a **sparse non-negative** activation vector, then runs the
-  linear-attention update over a synapse-level state;
-- separates what is **formal in the paper** (the linear-attention formulation) from
-  what is **developer-reported** (~5% sparsity, monosemantic synapses, scale-free
-  connectivity, Sudoku-Extreme, 1B→~600B scaling, HyperPod integration);
-- ties BDH-CQ's **additive-per-demonstration** contextual-memory special case
-  directly to `S = Σ kᵢvᵢᵀ`, and explains adaptation-without-weight-updates in those
-  terms, contrasting HRM/TRM's per-task backward pass;
+- quotes the paper's own definition — BDH-GPU is "a specific kind of ReLU-lowrank
+  feed-forward network, and a linear attention mechanism" (arXiv:2509.26507 §6.1) —
+  and the outer-product write in §1 is that linear-attention / fast-weight rule;
+- separates what is **formal in the paper** (the ReLU-lowrank + linear-attention
+  formulation §6.1; GPT-2 parity at 10M–1B params §4.2) from what is
+  **developer-reported** (the ~5% sparsity measurement §6.4; monosemanticity and
+  the scale-free graph; Sudoku Extreme 97.4%, from Pathway's Mar 2026 research
+  post; the ~600B scaling figure and SageMaker HyperPod development, from AWS/Pathway
+  material);
+- ties BDH-CQ's contextual-memory special case `Sₜ = Sₜ₋₁ + Uθ(Dₜ)` (arXiv:2608.09888
+  §3.2) directly to `S = Σ kᵢvᵢᵀ`, cites "no parameters are updated at inference
+  time" and the 150M / 29.5% pass@2 / $0.0007-per-task ARC-AGI-1 result, and
+  contrasts HRM/TRM's transductive per-task backward pass (§8);
 - explicitly notes where BDH-CQ has **no** direct role (the √(N/d) capacity law is a
   property of linear attention in general).
 
-**All BDH/BDH-CQ claims must be verified against the primary paper
-(arXiv:2509.26507) and the BDH-CQ technical report before submission.** Placeholders
-where a specific figure needs a citation are marked in `one-page-summary.md` and in
-§6 of `index.html`.
+**Every BDH/BDH-CQ figure in §6 was checked against the primary sources
+(arXiv:2509.26507, arXiv:2608.09888, Pathway's Sudoku post, AWS's write-up) and is
+cited with section numbers in `index.html` (§ References).**
 
 ---
 
@@ -174,9 +177,12 @@ where a specific figure needs a citation are marked in `one-page-summary.md` and
    write with an error-correcting (delta) write to cut interference; the delta-rule
    toggle in §2.
 3. **Kosowski et al. — *The Dragon Hatchling: The Missing Link between the
-   Transformer and Models of the Brain* (arXiv:2509.26507, 2025).** Reformulates
-   attention as a Hebbian synaptic state with sparse non-negative activations;
-   reports scaling experiments and Sudoku-Extreme reasoning.
+   Transformer and Models of the Brain* (arXiv:2509.26507, 2025)**, and
+   **Engdahl, Kosowski et al. — *BDH-CQ: In-Context Learning with Recurrent Latent
+   Reasoning* (arXiv:2608.09888, 2026).** BDH reformulates attention as a Hebbian
+   synaptic state with sparse (~5%) positive activations (GPT-2 parity, 10M–1B
+   params); BDH-CQ uses the additive-per-demonstration form of that state for
+   inference-time task adaptation without weight updates.
 
 Supporting: Katharopoulos et al., *Transformers are RNNs* (ICML 2020); Ramsauer et
 al., *Hopfield Networks is All You Need* (ICLR 2021); Schmidhuber (1992) and Ba et

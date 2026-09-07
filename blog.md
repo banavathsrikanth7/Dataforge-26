@@ -174,53 +174,61 @@ reads* (Kosowski et al., 2025). The concept in this explainer is not an analogy
 for BDH's mechanism — the fast-weight / linear-attention state **is** the
 mechanism, in BDH's GPU-friendly form.
 
-**The shared skeleton.** BDH-GPU generates its keys and values from
-**ReLU-low-rank** transformations of a **sparse, non-negative** activation vector
-(around 5% of neurons active in reported runs, with sparsity varying with
-predictability), then runs the linear-attention update above over a synapse-level
-state `σ` that is shared across memory, adaptation and reasoning. The outer-product
-write in §1 is that Hebbian rule; BDH makes it trainable and scalable.
+**The shared skeleton.** The Dragon Hatchling paper (arXiv:2509.26507, §6.1)
+defines BDH-GPU as "a combination of two blocks: a specific kind of *ReLU-lowrank*
+feed-forward network, and a *linear attention* mechanism." Its positive activations
+are sparse at "about 5% level" (§6.4). The outer-product write in §1 is that
+linear-attention / fast-weight rule; BDH makes it trainable and scalable, and
+matches GPT-2 on language and translation at equal parameters from 10M to 1B (§4.2).
 
 **What BDH adds, with evidence labels:**
 
-| Ingredient | Role | Evidence level |
+| Ingredient | Detail | Evidence level |
 |---|---|---|
-| ReLU sparse non-negative activations (~5%) | keeps "keys" concept-selective, so synaptic writes stay legible and interference stays low | developer-reported |
-| Linear attention over ReLU-low-rank features (BDH-GPU) | the GPU-friendly equivalent of the neuron–synapse dynamics — the write/read you explored | formal, in paper |
-| Monosemantic synapses; scale-free connectivity | individual synapses reported to encode single concepts; a few hub neurons carry many connections | developer-reported interpretability observations |
-| Pretraining scaling 1B → ~600B params; SageMaker HyperPod / AWS integration | evidence the formulation trains at scale on standard infrastructure | developer-reported early experiments |
-| Sudoku-Extreme result (BDH) | constraint-reasoning benchmark cited as evidence the evolving state supports multi-step inference | developer-reported benchmark, not an independent reproduction |
+| ReLU-lowrank feed-forward + linear attention | the GPU-friendly form of the neuron–synapse dynamics — the write/read you explored (§6.1) | **formal, in paper** |
+| GPT-2 parity at 10M–1B params, language + translation (§4.2) | Transformer-like scaling laws | **formal, in paper** |
+| Positive activations sparse at ~5% (§6.4) | keeps "keys" concept-selective, so writes stay legible and interference stays low | developer-reported |
+| Monosemanticity on language tasks; scale-free graph, heavy-tailed degree distribution | specific synapses strengthen for specific concepts; a few hub neurons carry many connections | developer-reported interpretability results |
+| Sudoku Extreme: **97.4%** over ~250k puzzles, no chain of thought; leading LLMs ≈ 0% | constraint-reasoning evidence the evolving state supports multi-step inference | developer-reported (Pathway research post, Mar 2026) |
+| Pretraining scaling laws reported to ~600B params; developed on Amazon SageMaker HyperPod | trains predictably at scale on standard infrastructure — largest *benchmarked* model in the family is 150M | developer-reported (Pathway / AWS) |
 
-**BDH-CQ: the additive-per-demonstration case.** BDH-CQ is a later system that
-learns from demonstrations and reasons without a written chain of thought. Its
-technical report relates its contextual memory to attention, fast-weight memory
-and linear attention, and names a special case where the state **accumulates
-additively, one contribution per demonstration** — exactly `S = Σ kᵢvᵢᵀ` with `i`
-indexing demonstrations instead of tokens. Two consequences follow directly:
+**BDH-CQ: the additive-per-demonstration case.** BDH-CQ (arXiv:2608.09888)
+"combines in-context learning with recurrent latent reasoning … without verbalizing
+its intermediate reasoning." Its state update is `Sₜ = Uθ(Sₜ₋₁, Dₜ)` for the `t`-th
+demonstration `Dₜ`, and its report calls the interpretation "generally related to
+attention, fast-weight memory, and linear-attention views of contextual
+association … with linear attention being the conceptually simplest standalone
+realization … capturing the special case `Sₜ = Sₜ₋₁ + Uθ(Dₜ)`" (§3.2) — exactly
+`S = Σ kᵢvᵢᵀ` with `i` indexing demonstrations. Two consequences follow directly:
 
-- **Adaptation without weight updates.** BDH-CQ reports solving unseen
-  ARC-AGI-style tasks with no evaluation-task demonstrations in training and no
-  parameter updates at inference. In our terms, the "learning" is the accumulation
-  of outer products into `S` during the forward pass — the weights are frozen, the
-  *state* carries the new rule. Contrast HRM and TRM, which take a backward pass
-  per task (augmentation into training samples, a learned puzzle embedding, voting
-  over augmentations).
-- **Demonstration coverage is an interference-budget question.** More
-  demonstrations sharpen the recalled rule, up to the point where their key
-  overlap starts blurring it — the same trade-off as §3. BDH-CQ's low / medium /
-  high "effort" settings spend more *recurrent* compute reading that state, not
-  more chain-of-thought tokens.
+- **Adaptation without weight updates.** "Neither task identifiers nor
+  evaluation-task demonstration pairs participate in training, and no parameters
+  are updated at inference time." The "learning" is the accumulation of outer
+  products into `S` during the forward pass — weights frozen, the *state* carries
+  the new rule. A 150M-parameter BDH-CQ reaches **29.5% pass@2 on public ARC-AGI-1**
+  (400 tasks) at ~**$0.0007 per task**. Contrast HRM / TRM, whose "ARC pipeline is
+  transductive: demonstration pairs from evaluation tasks are augmented and used in
+  optimization … a previously unseen hidden task therefore requires backward-pass
+  adaptation before it can be evaluated" (§8).
+- **Effort is recurrent compute, not tokens.** BDH-CQ is trained with low / medium
+  / high latent-reasoning levels, selectable at inference — pass@2 of **21.0 / 27.0
+  / 29.5%** as effort rises. The extra cost is more iterations over the state, not
+  more chain-of-thought text. Demonstration coverage is then an interference-budget
+  question: more demonstrations sharpen the recalled rule until their overlap
+  starts blurring it — the trade-off from §3.
 
 **Where BDH-CQ has no direct role.** The `√(N/d)` capacity law and the
 softmax-vs-linear comparison are properties of linear attention in general.
 BDH-CQ neither introduced nor depends on them; it inherits them by building on the
 family. Saying otherwise would be inventing a connection.
 
-**Evidence discipline.** Everything labelled *developer-reported* above comes from
-Pathway's own paper or technical report, not from an independent reproduction. A
-benchmark score is not a deployment; a reported number is not an external
-replication. The toy in the explainer is an illustration — a hand-built memory,
-not a BDH checkpoint. What *is* solid: the linear-attention and associative-memory
+**Evidence discipline.** *Formal, in paper* means an equation or definition stated
+in the arXiv papers (the ReLU-lowrank + linear-attention formulation; 10M–1B GPT-2
+parity). *Developer-reported* means a result Pathway or AWS published — the ~5%
+sparsity measurement, Sudoku 97.4%, ARC-AGI 29.5%, the 600B scaling figure,
+HyperPod development — with no independent reproduction. A benchmark score is not a
+deployment. The toy in the explainer is an illustration — a hand-built memory, not
+a BDH checkpoint. What *is* solid: the linear-attention and associative-memory
 results in §§1–5 are standard, published and widely replicated.
 
 ---
@@ -258,6 +266,8 @@ results in §§1–5 are standard, published and widely replicated.
 - A. Katharopoulos, A. Vyas, N. Pappas, F. Fleuret (2020). *Transformers are RNNs: Fast Autoregressive Transformers with Linear Attention.* ICML 2020.
 - S. Yang, B. Wang, Y. Shen, R. Panda, Y. Kim (2024). *Gated Linear Attention Transformers with Hardware-Efficient Training.* ICML 2024.
 - S. Yang, B. Wang, Y. Zhang, Y. Shen, Y. Kim (2024). *Parallelizing Linear Transformers with the Delta Rule over Sequence Length.* NeurIPS 2024.
-- A. Kosowski et al. (2025). *The Dragon Hatchling: The Missing Link between the Transformer and Models of the Brain.* Pathway. arXiv:2509.26507. With the Pathway posts "From Attention to Synapses: Deriving BDH", "Why BDH Uses a Brain-Inspired Architecture", and "The Equations of Reasoning".
-- Pathway (2025–2026). *BDH-CQ technical report.*
-- Hierarchical Reasoning Model (HRM) and Tiny Reasoning Model (TRM) on ARC — cited as the optimization-route contrast.
+- A. Kosowski, P. Uznański, J. Chorowski, Z. Stamirowska, M. Bartoszkiewicz (2025). *The Dragon Hatchling: The Missing Link between the Transformer and Models of the Brain.* Pathway. arXiv:2509.26507 (30 Sep 2025). Companion code: github.com/pathwaycom/bdh.
+- B. Engdahl, A. Kosowski, J. Chorowski, Z. Stamirowska, P. Uznański, et al. (2026). *BDH-CQ: In-Context Learning with Recurrent Latent Reasoning.* Pathway. arXiv:2608.09888 (10 Aug 2026).
+- Pathway (17 Mar 2026). *Beyond Transformers: solving Sudoku Extreme.* pathway.com/research/beyond-transformers-sudoku-bench.
+- AWS Startups. *Pathway's BDH: a new post-transformer approach to enterprise AI, on AWS.* aws.amazon.com — SageMaker HyperPod development; ~600B pretraining-scaling figure.
+- HRM / TRM contrast: drawn in BDH-CQ §8 ("Task-trained recursive solvers").

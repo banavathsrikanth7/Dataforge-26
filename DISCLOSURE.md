@@ -12,11 +12,14 @@ used to:
   simulation and an independent NumPy reimplementation.
 
 AI was **not** used to invent citations, benchmark numbers, or architectural
-claims. Every reference points to a real, locatable paper or Pathway publication.
-Claims specific to BDH / BDH-CQ are attributed to the primary paper
-(arXiv:2509.26507) and the BDH-CQ technical report and are labelled by evidence
-level; any that rest on a specific figure carry an explicit "verify against
-primary source" marker in the README and in §6 of the explainer.
+claims. Every §6 claim was checked against primary sources — *The Dragon Hatchling*
+(arXiv:2509.26507), *BDH-CQ* (arXiv:2608.09888), Pathway's Sudoku research post
+(Mar 2026), and AWS Startups' BDH write-up — and is cited with section numbers in
+`index.html` (§ References). During that check, three earlier draft claims were
+corrected: the scaling range (paper tests 10M–1B, not "1B–600B"; the 600B figure is
+a Pathway scaling-law claim, re-sourced and re-labelled), the Sudoku result
+(re-sourced from the paper to Pathway's research post, with the 97.4% figure
+added), and a "sparsity varies with predictability" clause (unverified, removed).
 
 The registered team is responsible for understanding and defending every
 component: the equations, the JavaScript, every control's mapping to a concept

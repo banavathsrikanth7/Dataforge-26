@@ -35,34 +35,35 @@ subtracts the current prediction before writing, cutting interference for repeat
 keys. RetNet, Mamba's state updates, GLA and Gated DeltaNet differ mainly along
 these two axes.
 
-**Where BDH and BDH-CQ sit.** BDH-GPU builds its keys and values from
-**ReLU-low-rank** transformations of a sparse, non-negative activation vector
-(~5% of neurons active in reported runs, varying with predictability), then runs
-the linear-attention update over a synapse-level state σ shared across memory,
-adaptation and reasoning (Kosowski et al., 2025; "From Attention to Synapses").
-Sparsity keeps the "keys" concept-selective, which the authors link to reported
-monosemantic synapses and scale-free connectivity — developer-reported
-interpretability observations, not independent reproductions. **BDH-CQ**, a later
-system that learns from demonstrations and reasons without a written chain of
-thought, relates its contextual memory to attention, fast-weight memory and linear
-attention, and names a **special case where state accumulates additively, one
-contribution per demonstration** — exactly `S = Σ kᵢvᵢᵀ` with `i` indexing
-demonstrations. BDH-CQ reports solving unseen ARC-AGI-style tasks with no
-evaluation-task demonstrations in training and no inference-time parameter updates:
-the "learning" is the accumulation of outer products during the forward pass, in
-contrast to HRM/TRM, which take a per-task backward pass. Its low/medium/high
-"effort" settings spend more *recurrent* compute reading that state, not more
-chain-of-thought tokens.
+**Where BDH and BDH-CQ sit.** The Dragon Hatchling paper (arXiv:2509.26507, §6.1)
+defines BDH-GPU as "a specific kind of ReLU-lowrank feed-forward network, and a
+linear attention mechanism"; its positive activations are sparse at "about 5%
+level" (§6.4), and it matches GPT-2 on language and translation at equal parameters
+from 10M to 1B (§4.2). Pathway separately reports monosemantic synapses, a
+scale-free heavy-tailed neuron graph, 97.4% on Sudoku Extreme with no chain of
+thought (research post, Mar 2026), and pretraining scaling laws holding to ~600B
+parameters (largest *benchmarked* model in the family is 150M). **BDH-CQ**
+(arXiv:2608.09888) adds demonstration-driven latent reasoning: its state update
+`Sₜ = Uθ(Sₜ₋₁, Dₜ)` is described as "generally related to attention, fast-weight
+memory, and linear-attention views of contextual association … capturing the
+special case `Sₜ = Sₜ₋₁ + Uθ(Dₜ)`" (§3.2) — exactly `S = Σ kᵢvᵢᵀ` with `i` indexing
+demonstrations. "Neither task identifiers nor evaluation-task demonstration pairs
+participate in training, and no parameters are updated at inference time"; a 150M
+model reaches 29.5% pass@2 on public ARC-AGI-1 at ~$0.0007/task. Contrast HRM/TRM,
+whose ARC pipeline is transductive and needs a per-task backward pass (§8). Its
+low/medium/high "effort" levels (pass@2 21.0 / 27.0 / 29.5%) spend more *recurrent*
+compute, not more chain-of-thought tokens.
 
 **Evidence, labelled.** The linear-attention and associative-memory results — the
 √(N/d) capacity law, the cross-talk decomposition, the delta rule — are external
 and widely replicated; classical Hopfield capacity is ≈ 0.14·d (Hopfield, 1982),
-raised by a nonlinear read (Ramsauer et al., 2021). Everything specific to BDH —
-~5% sparsity, Sudoku-Extreme reasoning, 1B→~600B pretraining-scaling experiments,
-SageMaker HyperPod integration, BDH-CQ's ARC-AGI numbers — is reported by Pathway
-in its paper and technical report. A benchmark is not a deployment; a
-developer-reported number is not an external reproduction; the interactive toy
-accompanying this summary is a hand-built memory, not a BDH checkpoint.
+raised by a nonlinear read (Ramsauer et al., 2021). The ReLU-lowrank + linear
+attention formulation and the 10M–1B GPT-2 parity are *formal / in the paper*.
+Everything else specific to BDH — the ~5% sparsity measurement, monosemanticity,
+Sudoku 97.4%, ARC-AGI 29.5%, the 600B scaling figure, SageMaker HyperPod
+development — is *developer-reported* by Pathway or AWS, with no independent
+reproduction. A benchmark is not a deployment; the interactive toy accompanying
+this summary is a hand-built memory, not a BDH checkpoint.
 
 **Most important limitation.** The √(N/d) law assumes the model has *learned* to
 place near-orthogonal keys; real linear-attention models often do not, so they
@@ -73,5 +74,5 @@ capacity law itself — this summary says so rather than inventing a connection.
 
 **Read next:** Katharopoulos et al., *Transformers are RNNs* (ICML 2020); Yang et
 al., *Gated Linear Attention* (ICML 2024) and *DeltaNet* (NeurIPS 2024); Kosowski
-et al., *The Dragon Hatchling* (arXiv:2509.26507, 2025) and the BDH-CQ technical
-report; Ramsauer et al., *Hopfield Networks is All You Need* (ICLR 2021).
+et al., *The Dragon Hatchling* (arXiv:2509.26507, 2025) and *BDH-CQ* (arXiv:2608.09888,
+2026); Ramsauer et al., *Hopfield Networks is All You Need* (ICLR 2021).
