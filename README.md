@@ -18,8 +18,8 @@ control exists so a learner can try to break it.
 
 | Item | URL |
 |---|---|
-| Public artifact (opens without sign-in) | _`<add deployed URL — see Deployment below>`_ |
-| Source repository | _`<add repo URL>`_ |
+| Public artifact (opens without sign-in) | https://dataforgepathway.netlify.app/ |
+| Source repository | https://github.com/banavathsrikanth7/Dataforge-26|
 | One-page concept summary (PDF) | [`one-page-summary.pdf`](one-page-summary.pdf) |
 | Blog (PDF) | [`blog.pdf`](blog.pdf) |
 
