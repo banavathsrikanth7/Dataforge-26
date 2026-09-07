@@ -1,0 +1,128 @@
+<!doctype html><html><head><meta charset="utf-8"><title>The Interference Budget - Concept Summary</title><style>
+@page { size: A4; margin: 18mm 16mm; }
+* { box-sizing: border-box; }
+body { font-family: Georgia, "Times New Roman", serif; font-size: 10.5pt; line-height: 1.5;
+       color: #1a1a1a; max-width: 100%; margin: 0; }
+h1 { font-size: 18pt; line-height: 1.2; margin: 0 0 .3em; font-family: "Segoe UI", Helvetica, Arial, sans-serif; }
+h2 { font-size: 13pt; margin: 1.1em 0 .35em; font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+     border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+h3 { font-size: 11pt; margin: .9em 0 .3em; font-family: "Segoe UI", Helvetica, Arial, sans-serif; color: #333; }
+p { margin: .5em 0; }
+code { font-family: "Cascadia Code", Consolas, monospace; font-size: 9pt; background: #f0f0ee;
+       padding: 0 2px; border-radius: 3px; }
+pre { background: #f6f6f4; border: 1px solid #ddd; border-radius: 5px; padding: 8px 10px;
+      font-size: 8.5pt; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+pre code { background: none; font-size: 8.5pt; }
+table { border-collapse: collapse; width: 100%; font-size: 8.8pt; margin: .8em 0; page-break-inside: avoid; }
+th, td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; }
+th { background: #eee; font-family: "Segoe UI", Helvetica, Arial, sans-serif; }
+blockquote { border-left: 3px solid #888; margin: .8em 0; padding: .2em 0 .2em 12px; color: #444;
+             font-style: italic; }
+hr { border: 0; border-top: 1px solid #ccc; margin: 1.2em 0; }
+strong { color: #000; }
+a { color: #1a1a1a; text-decoration: underline; }
+ul, ol { margin: .5em 0; padding-left: 22px; }
+li { margin: .25em 0; }
+@page{size:A4;margin:12mm 13mm;}body{font-size:9.3pt;line-height:1.38;}h1{font-size:15pt;margin-bottom:.2em;}h2{font-size:11pt;margin:.7em 0 .25em;}table{font-size:8pt;margin:.5em 0;}th,td{padding:3px 5px;}p{margin:.38em 0;}</style></head><body><h1>The Interference Budget: fast weights, linear attention, and the synaptic memory of BDH</h1>
+<p><strong>Concept.</strong> A <em>fast-weight</em> memory replaces the growing key–value cache of softmax
+attention with one fixed matrix <code>S</code>, updated by Hebbian outer products as tokens
+arrive: <code>Sᵢ = Sᵢ₋₁ + kᵢvᵢᵀ</code>, read as <code>out = Sᵀq</code>. Seen as a running state, this <em>is</em>
+linear attention (Katharopoulos et al., 2020), and it is the mechanism Pathway's
+<strong>Dragon Hatchling (BDH)</strong> uses when it "reformulates attention as synaptic memory
+that updates as the model reads" (Kosowski et al., 2025).</p>
+<p><strong>Central claim.</strong> Because every binding is summed into the same matrix, reading
+back an earlier value returns the true value <strong>plus a cross-talk term</strong>
+<code>Σⱼ≠ᵢ (kᵢ·kⱼ)vⱼ</code>. For random unit keys in <code>d</code> dimensions the expected recall error
+scales as <strong>√(N/d)</strong> for <code>N</code> stored bindings; it is near-zero only when keys are
+near-orthogonal, and average key correlation <code>ρ</code> adds a floor <code>√((N−1)ρ²)</code> that
+more dimensions cannot remove. A fixed state can therefore <em>process</em> an unbounded
+stream but cannot <em>retain</em> unbounded content: forgetting through interference is
+forced by linear algebra, not a tunable defect.</p>
+<p><strong>Design pressure and trade-off.</strong> Softmax attention keeps every past token in a
+KV cache, so memory and per-token compute grow with sequence length. Fast weights
+trade that cache for constant memory and linear-time inference. The cost is
+expressivity: a rank-<code>min(d,m)</code> state cannot reproduce arbitrary long-range
+retrieval the way a full cache can, which shows up on precise long-copy benchmarks
+(Yang et al., 2024).</p>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>State</th>
+<th>Cost/token</th>
+<th>Exact recall</th>
+<th>Adaptation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Softmax + KV cache</td>
+<td>grows O(t)</td>
+<td>O(t)</td>
+<td>yes, to context limit</td>
+<td>in-context, lossless</td>
+</tr>
+<tr>
+<td>Linear attention / fast weights (2020)</td>
+<td>fixed d×m</td>
+<td>O(1)</td>
+<td>lossy, √(N/d) error</td>
+<td>additive in state</td>
+</tr>
+<tr>
+<td>Gated LA / DeltaNet (2024)</td>
+<td>fixed d×m</td>
+<td>O(1)</td>
+<td>better: gating + error-correcting write</td>
+<td>gated in state</td>
+</tr>
+<tr>
+<td><strong>BDH-GPU</strong> (2025)</td>
+<td>synaptic σ over ReLU-low-rank features</td>
+<td>O(1)</td>
+<td>lossy, aided by ~5% sparse activations</td>
+<td>Hebbian in synaptic state</td>
+</tr>
+</tbody>
+</table>
+<p>A decay <code>λ&lt;1</code> buys recency by genuinely losing old information; the delta rule
+subtracts the current prediction before writing, cutting interference for repeated
+keys. RetNet, Mamba's state updates, GLA and Gated DeltaNet differ mainly along
+these two axes.</p>
+<p><strong>Where BDH and BDH-CQ sit.</strong> BDH-GPU builds its keys and values from
+<strong>ReLU-low-rank</strong> transformations of a sparse, non-negative activation vector
+(~5% of neurons active in reported runs, varying with predictability), then runs
+the linear-attention update over a synapse-level state σ shared across memory,
+adaptation and reasoning (Kosowski et al., 2025; "From Attention to Synapses").
+Sparsity keeps the "keys" concept-selective, which the authors link to reported
+monosemantic synapses and scale-free connectivity — developer-reported
+interpretability observations, not independent reproductions. <strong>BDH-CQ</strong>, a later
+system that learns from demonstrations and reasons without a written chain of
+thought, relates its contextual memory to attention, fast-weight memory and linear
+attention, and names a <strong>special case where state accumulates additively, one
+contribution per demonstration</strong> — exactly <code>S = Σ kᵢvᵢᵀ</code> with <code>i</code> indexing
+demonstrations. BDH-CQ reports solving unseen ARC-AGI-style tasks with no
+evaluation-task demonstrations in training and no inference-time parameter updates:
+the "learning" is the accumulation of outer products during the forward pass, in
+contrast to HRM/TRM, which take a per-task backward pass. Its low/medium/high
+"effort" settings spend more <em>recurrent</em> compute reading that state, not more
+chain-of-thought tokens.</p>
+<p><strong>Evidence, labelled.</strong> The linear-attention and associative-memory results — the
+√(N/d) capacity law, the cross-talk decomposition, the delta rule — are external
+and widely replicated; classical Hopfield capacity is ≈ 0.14·d (Hopfield, 1982),
+raised by a nonlinear read (Ramsauer et al., 2021). Everything specific to BDH —
+~5% sparsity, Sudoku-Extreme reasoning, 1B→~600B pretraining-scaling experiments,
+SageMaker HyperPod integration, BDH-CQ's ARC-AGI numbers — is reported by Pathway
+in its paper and technical report. A benchmark is not a deployment; a
+developer-reported number is not an external reproduction; the interactive toy
+accompanying this summary is a hand-built memory, not a BDH checkpoint.</p>
+<p><strong>Most important limitation.</strong> The √(N/d) law assumes the model has <em>learned</em> to
+place near-orthogonal keys; real linear-attention models often do not, so they
+forget more than the best case. And none of this is durable learning — the state
+lives for one session, and consolidating useful fast state into slow weights is an
+open problem the BDH authors name explicitly. Where BDH-CQ has no direct role — the
+capacity law itself — this summary says so rather than inventing a connection.</p>
+<p><strong>Read next:</strong> Katharopoulos et al., <em>Transformers are RNNs</em> (ICML 2020); Yang et
+al., <em>Gated Linear Attention</em> (ICML 2024) and <em>DeltaNet</em> (NeurIPS 2024); Kosowski
+et al., <em>The Dragon Hatchling</em> (arXiv:2509.26507, 2025) and the BDH-CQ technical
+report; Ramsauer et al., <em>Hopfield Networks is All You Need</em> (ICLR 2021).</p></body></html>
