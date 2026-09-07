@@ -1,0 +1,1129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Interference Budget</title>
+<meta name="description" content="An interactive explainer: a fixed-size fast-weight memory recalls a long stream without growing, but every write spends an interference budget set by key overlap. This is linear attention, and it is the core mechanism of the Dragon Hatchling (BDH) architecture." />
+<style>
+  :root{
+    --bg:#f7f6f3; --panel:#ffffff; --ink:#1c1b19; --muted:#5f5b54; --line:#e4e1da;
+    --accent:#2f6f4f; --accent-soft:#e3efe8; --warn:#b4451f; --warn-soft:#f6e6df;
+    --truth:#2f6f4f; --estimate:#b4451f; --crosstalk:#c98a1a;
+    --grid:#efeee9; --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.06);
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code","Consolas",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  :root:not([data-theme=light]){
+    @media (prefers-color-scheme: dark){
+      --bg:#17181a; --panel:#202225; --ink:#ececec; --muted:#a3a3a0; --line:#33363a;
+      --accent:#6fbf95; --accent-soft:#1f2e27; --warn:#e0895f; --warn-soft:#2e211b;
+      --truth:#6fbf95; --estimate:#e0895f; --crosstalk:#e0b45f;
+      --grid:#26282b; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme=dark]{
+    --bg:#17181a; --panel:#202225; --ink:#ececec; --muted:#a3a3a0; --line:#33363a;
+    --accent:#6fbf95; --accent-soft:#1f2e27; --warn:#e0895f; --warn-soft:#2e211b;
+    --truth:#6fbf95; --estimate:#e0895f; --crosstalk:#e0b45f;
+    --grid:#26282b; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto;padding:0 20px}
+  h1,h2,h3{line-height:1.25;font-weight:650;letter-spacing:-.01em}
+  h1{font-size:clamp(1.8rem,4.5vw,2.7rem);margin:.2em 0 .3em}
+  h2{font-size:clamp(1.3rem,3vw,1.7rem);margin:2.4em 0 .5em;padding-top:.6em}
+  h3{font-size:1.08rem;margin:1.6em 0 .4em}
+  p{margin:.7em 0}
+  a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+  code{font-family:var(--mono);font-size:.92em;background:var(--accent-soft);
+    padding:.08em .35em;border-radius:4px}
+  .eq{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:14px 16px;margin:1em 0;overflow-x:auto;font-size:.95rem;
+    box-shadow:var(--shadow)}
+  .muted{color:var(--muted)}
+  .small{font-size:.86rem}
+  header.hero{padding:46px 0 8px}
+  .kicker{font-family:var(--mono);font-size:.8rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 6px}
+  .claim{border-left:3px solid var(--accent);padding:10px 0 10px 18px;margin:18px 0;
+    font-size:1.15rem;line-height:1.5}
+  .claim b{background:var(--accent-soft);padding:0 .2em}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:20px;margin:20px 0;box-shadow:var(--shadow)}
+  .panel h3:first-child{margin-top:0}
+  .row{display:flex;gap:20px;flex-wrap:wrap}
+  .row>*{flex:1 1 260px;min-width:0}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px;margin:6px 0}
+  .ctl label{display:block;font-size:.82rem;font-weight:600;margin-bottom:3px}
+  .ctl .val{font-family:var(--mono);color:var(--accent);font-weight:700}
+  .ctl input[type=range]{width:100%;accent-color:var(--accent)}
+  .ctl .hint{font-size:.76rem;color:var(--muted);margin-top:2px}
+  .toggles{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px}
+  .toggles label{font-size:.85rem;display:flex;gap:6px;align-items:center;cursor:pointer}
+  button{font-family:var(--sans);font-size:.9rem;font-weight:600;cursor:pointer;
+    background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px}
+  button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  button:active{transform:translateY(1px)}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  canvas{max-width:100%;height:auto;display:block}
+  .stat{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0;font-family:var(--mono);font-size:.9rem}
+  .stat b{color:var(--ink)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;margin:8px 0}
+  .swatch{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:middle}
+  .callout{background:var(--warn-soft);border:1px solid var(--warn);border-radius:12px;padding:14px 16px;margin:16px 0}
+  .callout .tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--warn);font-weight:700}
+  .evidence{display:inline-block;font-family:var(--mono);font-size:.7rem;font-weight:700;
+    padding:2px 7px;border-radius:5px;letter-spacing:.03em;vertical-align:middle}
+  .ev-formal{background:var(--accent-soft);color:var(--accent)}
+  .ev-dev{background:var(--warn-soft);color:var(--warn)}
+  .ev-toy{background:var(--grid);color:var(--muted);border:1px solid var(--line)}
+  table{border-collapse:collapse;width:100%;font-size:.86rem;margin:1em 0;display:block;overflow-x:auto}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--accent-soft);font-weight:650}
+  ol.steps{counter-reset:s;list-style:none;padding:0}
+  ol.steps>li{counter-increment:s;position:relative;padding:6px 0 6px 40px;margin:6px 0}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:4px;width:26px;height:26px;
+    background:var(--accent);color:#fff;border-radius:50%;display:grid;place-items:center;
+    font-family:var(--mono);font-size:.82rem;font-weight:700}
+  nav.toc{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);
+    padding:8px 0;font-size:.8rem;overflow-x:auto;white-space:nowrap}
+  nav.toc a{margin-right:16px;color:var(--muted);text-decoration:none}
+  nav.toc a:hover{color:var(--accent)}
+  .themebtn{position:fixed;right:14px;bottom:14px;z-index:30;background:var(--panel);
+    color:var(--ink);border:1px solid var(--line);border-radius:50%;width:42px;height:42px;
+    font-size:1.1rem;box-shadow:var(--shadow)}
+  footer{margin:60px 0 40px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+  .refs{font-size:.84rem;line-height:1.5}
+  .refs li{margin:.5em 0}
+  sup a{text-decoration:none;font-weight:700}
+  .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;
+    padding:2px 10px;font-size:.76rem;font-family:var(--mono);margin:2px 4px 2px 0}
+  @media (max-width:560px){ body{font-size:15px} .panel{padding:15px} }
+</style>
+</head>
+<body>
+
+<button class="themebtn" id="themebtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#top">Claim</a>
+    <a href="#write">1 · The write</a>
+    <a href="#read">2 · The read</a>
+    <a href="#law">3 · The √ law</a>
+    <a href="#forget">4 · Forgetting</a>
+    <a href="#linattn">5 · = Linear attention</a>
+    <a href="#bdh">6 · Inside BDH</a>
+    <a href="#limits">7 · Limits</a>
+    <a href="#sandbox">Sandbox</a>
+    <a href="#refs">References</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="hero" id="top">
+  <p class="kicker">DataForge 2026 · Pathway Track · Interactive explainer</p>
+  <h1>The Interference Budget</h1>
+  <p class="muted" style="font-size:1.05rem;max-width:65ch">
+    A fixed-size memory can read an endless stream of facts without ever growing.
+    That is not magic and it is not free. Every fact you write in spends from the
+    same budget, and this page lets you watch the bill arrive.
+  </p>
+
+  <div class="claim" id="the-claim">
+    A fixed-size fast-weight memory <code>S = Σ&nbsp;kᵢvᵢᵀ</code> stores a stream of
+    key→value bindings <b>without ever growing</b>, but because every binding is
+    added into the <b>same matrix</b>, reading back an earlier value returns the
+    true value <b>plus a cross-talk term</b> <code>Σⱼ≠ᵢ (kᵢ·kⱼ)&nbsp;vⱼ</code> whose
+    size is set by how much the keys overlap — so recall error grows like
+    <b>√(N/d)</b> and is near-zero only when the keys are near-orthogonal.
+  </div>
+  <p class="small muted">
+    That sentence is falsifiable. If you can make recall stay perfect while
+    packing in many correlated keys, the claim is wrong. Every control below
+    exists so you can try.
+  </p>
+
+  <div class="panel" id="hero-demo">
+    <h3>Preset: 20 facts streaming into a 64&times;10 memory, probing fact #2</h3>
+    <p class="small muted" style="margin-top:-4px">
+      Running live in your browser — real matrix arithmetic, no animation track.
+      The heatmap is the actual memory matrix <code>S</code>. The bars compare the
+      <span style="color:var(--truth);font-weight:700">true value</span> of a
+      probed fact against what the memory
+      <span style="color:var(--estimate);font-weight:700">returns</span>.
+    </p>
+    <div class="row">
+      <div>
+        <canvas id="heroHeat" width="520" height="330"></canvas>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--accent)"></span>positive weight</span>
+          <span><span class="swatch" style="background:var(--warn)"></span>negative weight</span>
+        </div>
+      </div>
+      <div>
+        <canvas id="heroBars" width="520" height="230"></canvas>
+        <div class="stat" id="heroStat"></div>
+        <div class="btnrow">
+          <button id="heroPlay">Pause</button>
+          <button class="ghost" id="heroReseed">New random stream</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Before you touch anything</h3>
+    <p class="small" style="margin-top:-4px"><b>Audience.</b> You have seen attention
+      (<code>softmax(QKᵀ)V</code>), you can read a matrix–vector product, and you have
+      trained something small in PyTorch or NumPy. You do <i>not</i> need to know
+      linear attention, fast weights, Hopfield networks, or BDH — that is what this
+      builds.</p>
+    <p class="small"><b>Prerequisites.</b> Dot products, outer products, vector norms,
+      the idea that <code>softmax</code> attention keeps one key–value pair per past
+      token in a cache that grows with sequence length.</p>
+    <p class="small"><b>By the end you will be able to:</b></p>
+    <ol class="steps small">
+      <li>Write the fast-weight update and read as two one-line equations and say what each symbol is.</li>
+      <li>Predict, before running it, whether a given <code>(N, d, key-correlation)</code> setting will recall cleanly.</li>
+      <li>Derive the cross-talk term and explain why it is exactly zero for orthogonal keys.</li>
+      <li>Show that this memory <i>is</i> linear attention with a running state, not an approximation bolted on.</li>
+      <li>Point to where this mechanism sits inside Dragon Hatchling (BDH) and BDH-CQ, and name what BDH adds on top.</li>
+      <li>State the most important limitation: a fixed state forgets through interference, and within-session memory is not durable learning.</li>
+    </ol>
+    <p class="small muted">Estimated time: 12–15 minutes to read and play; the
+      60-second test is at the end.</p>
+  </div>
+</header>
+
+<!-- ============================================================= -->
+<h2 id="write">1 · The write: memory as a running sum of outer products</h2>
+
+<p>Softmax attention remembers the past by <i>keeping</i> it: every token leaves a
+<code>(key, value)</code> pair in a cache, and answering a query means scanning all
+of them. The cache grows with sequence length, so memory and compute per token
+grow too.<sup><a href="#r-kv">[7]</a></sup></p>
+
+<p>A <b>fast-weight</b> memory does the opposite. It never stores individual pairs.
+It keeps one matrix <code>S</code> and, for each new binding <code>(kᵢ, vᵢ)</code>,
+adds the <b>outer product</b> <code>kᵢ vᵢᵀ</code> into it:</p>
+
+<div class="eq">
+  write&nbsp;&nbsp;&nbsp; S<sub>i</sub> = S<sub>i-1</sub> + k<sub>i</sub> v<sub>i</sub><sup>T</sup>
+  &nbsp;&nbsp;&nbsp;&nbsp; (S is d&times;m, fixed size, independent of i)
+</div>
+
+<p>This is a <b>Hebbian</b> rule: the pattern <code>kᵢ</code> and the pattern
+<code>vᵢ</code> that are active together get their connection strengthened.
+Schmidhuber proposed exactly this "fast weight" scheme in 1992
+<sup><a href="#r-schmid">[1]</a></sup>; Ba et al. revived it in 2016
+<sup><a href="#r-ba">[2]</a></sup>. Below, step through 20 writes and watch the
+matrix fill in. Nothing is being learned — the keys and values are fixed random
+vectors, and each frame is one honest outer-product addition.</p>
+
+<div class="panel">
+  <div class="row">
+    <div>
+      <canvas id="wHeat" width="520" height="330"></canvas>
+      <div class="btnrow">
+        <button id="wStep">Write next ▸</button>
+        <button class="ghost" id="wPlay">Play</button>
+        <button class="ghost" id="wReset">Reset</button>
+      </div>
+      <p class="small muted" id="wCaption">Memory is empty. Press <b>Write next</b>.</p>
+    </div>
+    <div>
+      <canvas id="wOuter" width="520" height="330"></canvas>
+      <p class="small muted">Left: the current memory <code>S</code>.
+        Above: the single outer product <code>kᵢvᵢᵀ</code> being added this step.
+        Add them and you get the next <code>S</code>.</p>
+    </div>
+  </div>
+</div>
+
+<p class="small muted">Key idea to carry forward: after 20 writes the matrix looks
+like noise, but every binding is still in there — folded, not filed. Section 2
+pulls one back out.</p>
+
+<!-- ============================================================= -->
+<h2 id="read">2 · The read: what you get back is signal + cross-talk</h2>
+
+<p>To recall the value for a key <code>q</code>, multiply:</p>
+
+<div class="eq">
+  read&nbsp;&nbsp;&nbsp; out = S<sup>T</sup> q = Σ<sub>j</sub> (k<sub>j</sub> · q) v<sub>j</sub>
+</div>
+
+<p>Now set <code>q = kᵢ</code>, one of the keys you stored, and split the sum into
+the term you want and everything else. With unit-norm keys <code>kᵢ·kᵢ = 1</code>, so:</p>
+
+<div class="eq">
+  out = <span style="color:var(--truth)">v<sub>i</sub></span>
+        + <span style="color:var(--crosstalk)">Σ<sub>j≠i</sub> (k<sub>i</sub> · k<sub>j</sub>) v<sub>j</sub></span>
+  &nbsp;&nbsp;&nbsp; = signal + cross-talk
+</div>
+
+<p>The cross-talk is not noise the model added. It is <i>the other stored values,
+leaking in through the dot products between their keys and yours</i>. If every
+other key is exactly perpendicular to <code>kᵢ</code>, every
+<code>kᵢ·kⱼ = 0</code> and recall is <b>exact</b>. As keys tilt toward each other,
+their values bleed into your answer.</p>
+
+<div class="panel" id="readPanel">
+  <div class="controls">
+    <div class="ctl">
+      <label>Stored bindings&nbsp; N = <span class="val" id="rNv">8</span></label>
+      <input type="range" id="rN" min="2" max="60" value="8" />
+      <div class="hint">More facts share one matrix → more leak.</div>
+    </div>
+    <div class="ctl">
+      <label>Key dimension&nbsp; d = <span class="val" id="rDv">48</span></label>
+      <input type="range" id="rD" min="4" max="128" value="48" />
+      <div class="hint">Room to spread out. Random vectors in high d are nearly perpendicular.</div>
+    </div>
+    <div class="ctl">
+      <label>Key correlation&nbsp; ρ = <span class="val" id="rRhov">0.00</span></label>
+      <input type="range" id="rRho" min="0" max="90" value="0" />
+      <div class="hint">Pushes all keys toward a shared direction. ρ=0 random, ρ→1 nearly identical.</div>
+    </div>
+    <div class="ctl">
+      <label>Probe binding index&nbsp; i = <span class="val" id="rProbev">1</span></label>
+      <input type="range" id="rProbe" min="1" max="8" value="1" />
+      <div class="hint">Which stored fact to read back.</div>
+    </div>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="rDelta" /> Use the delta rule (write the <i>correction</i>, not the raw value)</label>
+  </div>
+
+  <div class="row" style="margin-top:14px">
+    <div>
+      <canvas id="rBars" width="520" height="260"></canvas>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--truth)"></span>true vᵢ</span>
+        <span><span class="swatch" style="background:var(--estimate)"></span>memory returns Sᵀkᵢ</span>
+        <span><span class="swatch" style="background:var(--crosstalk)"></span>cross-talk contribution</span>
+      </div>
+    </div>
+    <div>
+      <canvas id="rGauge" width="520" height="160"></canvas>
+      <div class="stat" id="rStat"></div>
+      <p class="small muted" id="rNote"></p>
+    </div>
+  </div>
+</div>
+
+<p><b>Try to break the claim.</b> Push <code>N</code> to 60 with <code>d = 4</code>:
+recall collapses. Now push <code>d</code> to 128: it snaps back, because 60 random
+vectors in 128-space are still almost perpendicular. Now hold <code>d = 128</code>
+and raise <code>ρ</code>: the collapse returns even though there is "room," because
+you removed the perpendicularity by hand. The memory's capacity was never about
+size in bytes — it is about <i>geometry</i>.</p>
+
+<div class="callout">
+  <span class="tag">Misconception check</span>
+  <p style="margin:.4em 0 0">"A bigger state means a longer memory." Not quite. A
+  <code>d×m</code> state has a fixed number of independent directions
+  (<code>min(d, m)</code>). Beyond that, new writes must reuse directions already
+  spoken for, and interference is forced by linear algebra, not by a
+  design choice you can tune away.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="law">3 · The law: recall error grows like √(N/d)</h2>
+
+<p>The cross-talk term is a sum of <code>N−1</code> roughly independent random
+vectors, each scaled by a dot product <code>kᵢ·kⱼ</code>. For random unit keys in
+<code>d</code> dimensions, <code>E[(kᵢ·kⱼ)²] ≈ 1/d</code>. Values have unit norm.
+So the expected squared error is about <code>(N−1)/d</code>, and:</p>
+
+<div class="eq">
+  RMS recall error ≈ √( (N−1) · ( ρ² + (1−ρ²)/d ) )
+  &nbsp;&nbsp;→&nbsp;&nbsp; ≈ √(N/d) &nbsp;when ρ = 0
+</div>
+
+<p>This is the same capacity story told by associative-memory theory: classic
+Hopfield networks store <code>≈ 0.14 d</code> patterns before recall breaks
+<sup><a href="#r-hopfield">[3]</a></sup>; modern Hopfield / attention pushes that
+much higher by making the read nonlinear <sup><a href="#r-modernhop">[4]</a></sup>.
+Our linear memory sits at the conservative end — and you can measure it.</p>
+
+<div class="panel" id="lawPanel">
+  <div class="controls">
+    <div class="ctl">
+      <label>Sweep variable</label>
+      <select id="lawVar" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)">
+        <option value="N">N (number of bindings), d fixed at 40</option>
+        <option value="d">d (key dimension), N fixed at 30</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Key correlation&nbsp; ρ = <span class="val" id="lRhov">0.00</span></label>
+      <input type="range" id="lRho" min="0" max="80" value="0" />
+      <div class="hint">Watch the measured curve peel away from the ρ=0 √ line.</div>
+    </div>
+    <div class="ctl">
+      <label>Trials averaged per point&nbsp; = <span class="val" id="lTrialv">40</span></label>
+      <input type="range" id="lTrial" min="5" max="150" value="40" />
+    </div>
+  </div>
+  <canvas id="lawPlot" width="900" height="380"></canvas>
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--estimate)"></span>measured RMS error (real runs)</span>
+    <span><span class="swatch" style="background:var(--truth)"></span>predicted √ law</span>
+  </div>
+  <p class="small muted" id="lawNote"></p>
+</div>
+
+<p>The measured points land on the predicted line while keys are random. Raise
+<code>ρ</code> and the measured curve lifts off — the <code>ρ²</code> term inside
+the square root takes over and no amount of extra <code>d</code> rescues it. That
+gap between the two curves is the whole lesson of this page in one picture.</p>
+
+<!-- ============================================================= -->
+<h2 id="forget">4 · Forgetting: interference vs decay</h2>
+
+<p>There are two different ways a fixed state loses information, and conflating
+them is a common error.</p>
+
+<table>
+  <tr><th>Mechanism</th><th>Equation</th><th>What it does</th><th>What it costs</th></tr>
+  <tr>
+    <td><b>Interference</b> (Section 2–3)</td>
+    <td><code>Sᵢ = Sᵢ₋₁ + kᵢvᵢᵀ</code></td>
+    <td>All bindings kept with equal weight; they blur together as they pile up.</td>
+    <td>Old facts never removed, just buried. Error grows with N.</td>
+  </tr>
+  <tr>
+    <td><b>Decay</b> (forget gate)</td>
+    <td><code>Sᵢ = λ·Sᵢ₋₁ + kᵢvᵢᵀ</code>, λ&lt;1</td>
+    <td>Down-weights the past every step; recent bindings dominate.</td>
+    <td>Distant facts are genuinely gone, whether or not they still matter.</td>
+  </tr>
+</table>
+
+<p>Gated linear attention, RetNet, Mamba's state updates, and DeltaNet all live in
+this table — they differ mainly in <i>how</i> λ and the write are computed
+(scalar, diagonal, data-dependent, or a rank-1 correction)
+<sup><a href="#r-gla">[5]</a></sup><sup><a href="#r-delta">[6]</a></sup>.</p>
+
+<div class="panel" id="forgetPanel">
+  <div class="controls">
+    <div class="ctl">
+      <label>Decay λ = <span class="val" id="fLamv">1.000</span></label>
+      <input type="range" id="fLam" min="800" max="1000" value="1000" />
+      <div class="hint">1.000 = pure interference. Lower = aggressive recency.</div>
+    </div>
+    <div class="ctl">
+      <label>Stream length&nbsp; N = <span class="val" id="fNv">40</span></label>
+      <input type="range" id="fN" min="5" max="120" value="40" />
+    </div>
+    <div class="ctl">
+      <label>Key dimension&nbsp; d = <span class="val" id="fDv">36</span></label>
+      <input type="range" id="fD" min="4" max="80" value="36" />
+    </div>
+  </div>
+  <canvas id="forgetPlot" width="900" height="340"></canvas>
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--estimate)"></span>recall error vs binding age (0 = most recent)</span>
+  </div>
+  <p class="small muted" id="forgetNote"></p>
+</div>
+
+<p><b>Read the shape.</b> At λ=1 the error curve is roughly flat — every binding is
+equally degraded. Drop λ and the curve tilts: recent bindings get sharp, old ones
+fall off a cliff. Neither is "better." A model that must answer questions about the
+start of a long document wants λ near 1 and pays in interference; a model tracking
+a fast-changing state wants low λ and pays in amnesia.</p>
+
+<div class="callout">
+  <span class="tag">Misconception check</span>
+  <p style="margin:.4em 0 0">"A recurrent state that never grows can therefore
+  remember arbitrarily long histories." It can <i>process</i> an unbounded stream
+  with bounded memory — but it cannot <i>retain</i> unbounded content. The claim on
+  this page is the honest version of that sentence.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="linattn">5 · This is not <i>like</i> linear attention. It is linear attention.</h2>
+
+<p>Take softmax attention and replace <code>exp(qᵀk)</code> with a plain feature-map
+dot product <code>φ(q)ᵀφ(k)</code> <sup><a href="#r-katha">[8]</a></sup>:</p>
+
+<div class="eq">
+softmax:&nbsp; outᵢ = Σⱼ ( exp(qᵢ·kⱼ) / Zᵢ ) vⱼ &nbsp;&nbsp;— needs all (kⱼ,vⱼ), cache grows<br>
+linear:&nbsp;&nbsp; outᵢ = Σⱼ≤ᵢ ( φ(qᵢ)·φ(kⱼ) ) vⱼ = φ(qᵢ)ᵀ ( Σⱼ≤ᵢ φ(kⱼ) vⱼᵀ ) = φ(qᵢ)ᵀ Sᵢ
+</div>
+
+<p>The parenthesised term <code>Sᵢ = Σⱼ≤ᵢ φ(kⱼ)vⱼᵀ</code> is <b>our memory</b>, and it
+obeys <code>Sᵢ = Sᵢ₋₁ + φ(kᵢ)vᵢᵀ</code> — the exact Hebbian write from Section 1.
+So "linear attention," "a fast-weight matrix," and "a Hebbian associative memory"
+are three names for one object. The move from softmax to linear is precisely the
+move from <i>a cache you scan</i> to <i>a state you accumulate</i>: constant memory,
+linear-time, and the interference budget you have been spending all page.</p>
+
+<div class="panel" id="attnPanel">
+  <p class="small muted" style="margin-top:0">Six bindings. Same query. Left:
+    softmax attention weights over the six stored keys. Right: the linear read,
+    decomposed into per-binding contributions <code>(φ(q)·φ(kⱼ))</code>. Softmax can
+    concentrate almost all weight on the true match; the linear read spreads a
+    tail across the rest — that tail is the cross-talk.</p>
+  <div class="controls">
+    <div class="ctl">
+      <label>Query aimed at binding&nbsp; <span class="val" id="aTgtv">3</span></label>
+      <input type="range" id="aTgt" min="1" max="6" value="3" />
+    </div>
+    <div class="ctl">
+      <label>Key correlation&nbsp; ρ = <span class="val" id="aRhov">0.30</span></label>
+      <input type="range" id="aRho" min="0" max="85" value="30" />
+    </div>
+    <div class="ctl">
+      <label>Feature map φ</label>
+      <select id="aPhi" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)">
+        <option value="id">identity (φ(x)=x)</option>
+        <option value="elu">elu+1 (non-negative)</option>
+        <option value="relu">relu (non-negative, sparse)</option>
+      </select>
+    </div>
+  </div>
+  <div class="row">
+    <div><canvas id="aSoft" width="520" height="240"></canvas><p class="small muted" style="text-align:center">softmax attention weights</p></div>
+    <div><canvas id="aLin" width="520" height="240"></canvas><p class="small muted" style="text-align:center">linear read, per-binding contribution</p></div>
+  </div>
+  <p class="small muted" id="aNote"></p>
+</div>
+
+<p>Switching φ to <code>relu</code> makes the contributions <b>non-negative and
+sparse</b> — most bindings contribute exactly zero. Hold that thought for the next
+section: it is the doorway into BDH.</p>
+
+<!-- ============================================================= -->
+<h2 id="bdh">6 · Where this mechanism lives: Dragon Hatchling (BDH) &amp; BDH-CQ</h2>
+
+<p>Pathway's <b>Dragon Hatchling</b> (BDH) is a Post-Transformer architecture whose
+stated design move is to <i>reformulate attention as synaptic memory that updates
+as the model reads</i> <sup><a href="#r-bdh">[9]</a></sup>. The concept you just
+explored is not analogous to BDH's mechanism — the fast-weight / linear-attention
+state <b>is</b> the mechanism, in its GPU-friendly form. This module says precisely
+what BDH keeps, what it adds, and how strong the evidence is for each part.</p>
+
+<h3>The shared skeleton</h3>
+
+<div class="row">
+  <div class="eq" style="flex:1 1 300px">
+    <b>This page's toy</b><br>
+    keys/values: fixed random vectors<br>
+    write:&nbsp; S ← S + kᵢ vᵢᵀ<br>
+    read:&nbsp;&nbsp; out = Sᵀ q<br>
+    <span class="small muted">S is a hand-built associative memory</span>
+  </div>
+  <div class="eq" style="flex:1 1 300px">
+    <b>BDH-GPU, as described in the paper</b> <span class="evidence ev-dev">developer-reported</span><br>
+    keys/values: <b>ReLU, low-rank</b> projections of the<br>
+    &nbsp;&nbsp;neuron activations x (non-negative, ~5% active)<br>
+    write:&nbsp; synaptic state σ ← σ + (linear-attention outer product)<br>
+    read:&nbsp;&nbsp; contextual term = σ applied to current activations<br>
+    <span class="small muted">σ is a trained model's synapse-level working memory</span>
+  </div>
+</div>
+
+<p>BDH's own framing: neurons and synapses following <b>local</b> rules, where
+"attention becomes synaptic memory through Hebbian writes"
+<sup><a href="#r-bdh">[9]</a></sup><sup><a href="#r-attn2syn">[10]</a></sup>. The
+outer-product write in Section 1 is that Hebbian rule. BDH-GPU makes it trainable
+and scalable by (1) generating the keys/values from <b>ReLU-low-rank</b>
+transformations of a sparse non-negative activation vector, and (2) sharing
+parameters so the same synaptic fabric carries memory, adaptation, and reasoning
+<sup><a href="#r-bdh">[9]</a></sup>.</p>
+
+<h3>What BDH adds on top of the skeleton</h3>
+<table>
+  <tr><th>Ingredient</th><th>Role</th><th>Evidence level</th></tr>
+  <tr><td>ReLU sparse non-negative activations (~5% neurons active; sparsity varies with predictability)</td>
+      <td>Makes the "keys" pick out a few concepts, so synaptic writes stay legible and interference stays low.</td>
+      <td><span class="evidence ev-dev">developer-reported</span> from BDH runs <sup><a href="#r-bdh">[9]</a></sup></td></tr>
+  <tr><td>Linear attention over ReLU-low-rank features (BDH-GPU)</td>
+      <td>The GPU-friendly equivalent of the neuron–synapse dynamics; this is the write/read you explored.</td>
+      <td><span class="evidence ev-formal">formal, in paper</span> <sup><a href="#r-bdh">[9]</a></sup></td></tr>
+  <tr><td>Monosemantic synapses; scale-free (heavy-tailed) connectivity</td>
+      <td>Individual synapses reported to encode single semantic concepts; a few hub neurons carry many connections.</td>
+      <td><span class="evidence ev-dev">developer-reported</span>, interpretability observations <sup><a href="#r-bdh">[9]</a></sup></td></tr>
+  <tr><td>Reported pretraining scaling 1B → ~600B params; SageMaker HyperPod / AWS integration</td>
+      <td>Evidence the formulation trains at scale on standard infrastructure.</td>
+      <td><span class="evidence ev-dev">developer-reported</span> early experiments <sup><a href="#r-bdh">[9]</a></sup></td></tr>
+  <tr><td>Sudoku Extreme result (BDH)</td>
+      <td>Reasoning-under-constraints benchmark, cited as evidence the evolving state supports multi-step inference.</td>
+      <td><span class="evidence ev-dev">developer-reported</span> benchmark, not an independent reproduction <sup><a href="#r-bdh">[9]</a></sup></td></tr>
+</table>
+
+<h3>BDH-CQ: the additive-per-demonstration special case</h3>
+
+<p>BDH-CQ is a later system in the family that "learns from demonstrations and
+reasons without a written chain of thought"
+<sup><a href="#r-bdhcq">[11]</a></sup>. Its technical report relates its
+<i>contextual memory</i> to attention, fast-weight memory, and linear-attention
+views of contextual association — and calls out a <b>special case where the state
+accumulates additively, one contribution per demonstration</b>
+<sup><a href="#r-bdhcq">[11]</a></sup>. That special case is <i>exactly</i>
+<code>S = Σ kᵢvᵢᵀ</code> from Section 1, with the index <code>i</code> running over
+demonstrations instead of tokens.</p>
+
+<p>Two consequences you can now reason about directly:</p>
+<ul>
+  <li><b>Adaptation without weight updates.</b> BDH-CQ reports solving unseen
+  ARC-AGI-style tasks with <i>no evaluation-task demonstrations in training and no
+  parameter updates at inference</i> <sup><a href="#r-bdhcq">[11]</a></sup>. In our
+  terms: the "learning" is the accumulation of outer products into <code>S</code>
+  during the forward pass. The weights are frozen; the <i>state</i> carries the new
+  rule. Contrast HRM / TRM, which take a backward pass per task
+  <sup><a href="#r-hrm">[12]</a></sup>.</li>
+  <li><b>Demonstration coverage is an interference-budget question.</b> More
+  demonstrations of a task sharpen the recalled rule — up to the point where their
+  key overlap starts blurring it, the same trade-off you watched in Section 3.
+  BDH-CQ's low / medium / high "effort" settings spend more <i>recurrent</i>
+  compute reading that state, not more chain-of-thought tokens
+  <sup><a href="#r-bdhcq">[11]</a></sup>.</li>
+</ul>
+
+<div class="callout">
+  <span class="tag">Evidence discipline</span>
+  <p style="margin:.4em 0 0">Everything labelled <span class="evidence ev-dev">developer-reported</span>
+  comes from Pathway's own paper or technical report, not from an independent
+  reproduction. A benchmark score is not a deployment; a reported number is not an
+  external replication. The toy on this page is an <span class="evidence ev-toy">illustration</span>
+  — a hand-built memory, not a BDH checkpoint, and it must not be cited as BDH
+  behaviour. What <i>is</i> solid: the linear-attention / fast-weight equations
+  (Sections 1–5) are standard, published, and cited below.</p>
+</div>
+
+<h3>Where BDH-CQ has no direct role</h3>
+<p>The <b>√(N/d) capacity law</b> and the softmax-vs-linear comparison are properties
+of linear attention in general. BDH-CQ neither introduced nor depends on them; it
+inherits them by building on the linear-attention family. Saying otherwise would be
+inventing a connection.</p>
+
+<!-- ============================================================= -->
+<h2 id="limits">7 · Limitations, failure cases, and honest labels</h2>
+
+<ol class="steps">
+  <li><b>The toy uses near-ideal keys.</b> We hand it random or deliberately
+  correlated unit vectors. A real model must <i>learn</i> to place near-orthogonal
+  keys, and often does not — so real linear-attention models forget more than the
+  √ law's best case.</li>
+  <li><b>Linear attention is strictly less expressive than softmax + full cache</b>
+  for exact retrieval. A growing KV cache can return any past value exactly; a
+  fixed state cannot, once you exceed its rank. Benchmarks that reward precise
+  long-range copying expose this <sup><a href="#r-delta">[6]</a></sup>.</li>
+  <li><b>Within-session memory is not learning.</b> Everything here happens in
+  <code>S</code> during one forward pass. Close the session and it is gone. This is
+  the stability–plasticity line: durable capability lives in weights, and
+  consolidating useful fast state into slow weights is an open problem BDH's
+  authors name explicitly <sup><a href="#r-bdh">[9]</a></sup>.</li>
+  <li><b>The √ law is an average.</b> It assumes random keys and unit values.
+  Structured or adversarial keys, or heavy-tailed value norms, break it in both
+  directions.</li>
+  <li><b>Illustration vs computation.</b> Sections 1–5 are live arithmetic in your
+  browser. Section 6's BDH equations are transcribed from the papers and simplified;
+  the neuron–synapse diagram is a teaching schematic, not a trace of a real BDH run.</li>
+</ol>
+
+<!-- ============================================================= -->
+<h2 id="explain">Explain it back</h2>
+<div class="panel">
+  <p>Before the 60-second test, say these out loud in your own words:</p>
+  <ul>
+    <li>Why does a fixed-size matrix <i>not</i> imply unbounded memory?</li>
+    <li>What, physically, is the cross-talk term made of?</li>
+    <li>Give one setting of <code>(N, d, ρ)</code> where recall is clean and one where it fails, and say why.</li>
+    <li>Finish the sentence: "Linear attention turns the KV cache into ______, which costs ______."</li>
+    <li>What does BDH add to this skeleton, and which of those additions is formally in the paper vs developer-reported?</li>
+  </ul>
+</div>
+
+<h2 id="test">The 60-second test</h2>
+<div class="panel">
+  <p><b>Setup.</b> Sandbox below, defaults (<code>d = 48</code>, <code>ρ = 0</code>,
+  <code>N = 6</code>): recall error is around <code>0.3</code>. Now drag
+  <code>N</code> to <code>24</code> <i>without changing d</i>.</p>
+  <p><b>Predict first.</b> Will the recall error roughly double, quadruple, or stay
+  flat? (√(24/48) vs √(6/48): error grows by √4 = 2×, to around <code>0.6–0.7</code>.)</p>
+  <p><b>Then check</b> against the number the sandbox prints. If your prediction was
+  in the right ballpark and you can say <i>why</i> in one sentence — "error scales
+  with √(N/d) because cross-talk is a sum of N−1 independent leaks each of typical
+  size 1/√d" — the claim at the top of the page is now yours.</p>
+</div>
+
+<!-- ============================================================= -->
+<h2 id="sandbox">Sandbox — every control in one place</h2>
+<div class="panel" id="sandboxPanel">
+  <div class="controls">
+    <div class="ctl"><label>N = <span class="val" id="sNv">6</span></label><input type="range" id="sN" min="2" max="80" value="6"></div>
+    <div class="ctl"><label>d = <span class="val" id="sDv">48</span></label><input type="range" id="sD" min="4" max="128" value="48"></div>
+    <div class="ctl"><label>m (value dim) = <span class="val" id="sMv">10</span></label><input type="range" id="sM" min="4" max="40" value="10"></div>
+    <div class="ctl"><label>ρ key correlation = <span class="val" id="sRhov">0.00</span></label><input type="range" id="sRho" min="0" max="90" value="0"></div>
+    <div class="ctl"><label>λ decay = <span class="val" id="sLamv">1.000</span></label><input type="range" id="sLam" min="800" max="1000" value="1000"></div>
+    <div class="ctl"><label>probe index i = <span class="val" id="sProbev">1</span></label><input type="range" id="sProbe" min="1" max="6" value="1"></div>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="sDelta"> delta rule</label>
+    <label><input type="checkbox" id="sNormV" checked> unit-norm values</label>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <div>
+      <canvas id="sHeat" width="520" height="300"></canvas>
+      <p class="small muted">memory matrix S (<span id="sDim"></span>)</p>
+    </div>
+    <div>
+      <canvas id="sBars" width="520" height="240"></canvas>
+      <div class="stat" id="sStat"></div>
+    </div>
+  </div>
+  <p class="small muted" id="sVerdict"></p>
+</div>
+
+<h2 id="refs">References — primary sources</h2>
+<p class="small muted">Claims in this page are cited beside where they are used.
+Sources marked <span class="evidence ev-dev">developer-reported</span> above are
+Pathway's own paper / technical report; the linear-attention and associative-memory
+results are external and peer-reviewed or widely replicated.</p>
+<ol class="refs">
+  <li id="r-schmid">[1] J. Schmidhuber (1992). <i>Learning to control fast-weight memories: an alternative to dynamic recurrent networks.</i> Neural Computation 4(1).</li>
+  <li id="r-ba">[2] J. Ba, G. Hinton, V. Mnih, J. Leibo, C. Ionescu (2016). <i>Using Fast Weights to Attend to the Recent Past.</i> NeurIPS 2016.</li>
+  <li id="r-hopfield">[3] J. Hopfield (1982). <i>Neural networks and physical systems with emergent collective computational abilities.</i> PNAS 79(8). (Capacity ≈ 0.14 d.)</li>
+  <li id="r-modernhop">[4] H. Ramsauer et al. (2021). <i>Hopfield Networks is All You Need.</i> ICLR 2021. (Modern Hopfield ↔ attention; exponential capacity with nonlinear read.)</li>
+  <li id="r-gla">[5] S. Yang, B. Wang, Y. Shen, R. Panda, Y. Kim (2024). <i>Gated Linear Attention Transformers with Hardware-Efficient Training.</i> ICML 2024.</li>
+  <li id="r-delta">[6] S. Yang, B. Wang, Y. Zhang, Y. Shen, Y. Kim (2024). <i>Parallelizing Linear Transformers with the Delta Rule over Sequence Length.</i> NeurIPS 2024. (DeltaNet; interference removal via rank-1 correction.)</li>
+  <li id="r-kv">[7] Overview of KV-cache growth and alternatives — see e.g. A. Kosowski's note on the Dragon Hatchling Hugging Face paper page, and surveys of KV-cache compression / eviction / retrieval (2023–2025).</li>
+  <li id="r-katha">[8] A. Katharopoulos, A. Vyas, N. Pappas, F. Fleuret (2020). <i>Transformers are RNNs: Fast Autoregressive Transformers with Linear Attention.</i> ICML 2020. (softmax → φ(q)ᵀφ(k); running state Sᵢ = Sᵢ₋₁ + φ(kᵢ)vᵢᵀ.)</li>
+  <li id="r-bdh">[9] A. Kosowski et al. (2025). <i>The Dragon Hatchling: The Missing Link between the Transformer and Models of the Brain.</i> Pathway. arXiv:2509.26507. Plus Pathway posts: "Why BDH Uses a Brain-Inspired Architecture", "From Attention to Synapses: Deriving BDH", "The Equations of Reasoning", and the official toy BDH implementation. <b>Verify every BDH figure in this page against this source before submission.</b></li>
+  <li id="r-attn2syn">[10] Pathway (2025). <i>From Attention to Synapses: Deriving BDH.</i> Blog post accompanying the Dragon Hatchling paper.</li>
+  <li id="r-bdhcq">[11] Pathway (2025–2026). <i>BDH-CQ technical report.</i> (Contextual memory ↔ attention / fast-weight / linear-attention; additive-per-demonstration special case; ARC-AGI results; low/medium/high effort inference-time scaling.) <b>Verify all BDH-CQ claims here against the report.</b></li>
+  <li id="r-hrm">[12] Hierarchical Reasoning Model (HRM) and Tiny Reasoning Model (TRM) on ARC — cited as the optimization-route contrast (per-task backward pass, augmentation, learned puzzle embeddings, voting).</li>
+</ol>
+
+<h3>Three recent papers (2022–2026) that use / extend / test this concept</h3>
+<ol class="refs">
+  <li>Yang et al., <i>Gated Linear Attention</i> (ICML 2024) — data-dependent gating on the fast-weight state; adopted in production-scale hybrids. [5]</li>
+  <li>Yang et al., <i>DeltaNet: parallelizing linear transformers with the delta rule</i> (NeurIPS 2024) — replaces the pure Hebbian write with an error-correcting write to cut interference; basis of later "Gated DeltaNet". [6]</li>
+  <li>Kosowski et al., <i>The Dragon Hatchling</i> (arXiv 2025) — reformulates attention as a Hebbian synaptic state with sparse non-negative activations; reports scaling and Sudoku-Extreme reasoning. [9]</li>
+  <li class="muted">(Supporting) Ramsauer et al., <i>Hopfield Networks is All You Need</i> (ICLR 2021) — ties the associative-memory capacity view to attention. [4]</li>
+</ol>
+
+<footer>
+  <p><b>The Interference Budget</b> — DataForge 2026 Pathway Track submission.
+  Built as a single self-contained HTML file: all computation in Sections 1–5 and
+  the Sandbox is live JavaScript running in your browser (see
+  <code>compute()</code> and <code>readState()</code> in source). Section 6's BDH
+  equations are transcribed and simplified from primary sources cited above; the
+  neuron–synapse diagram is a teaching schematic.</p>
+  <p>Falsifiable claim under test: recall error of <code>S = Σ kᵢvᵢᵀ</code> grows as
+  <code>√(N/d)</code> for random keys and is near-zero only for near-orthogonal
+  keys. Try to break it in the Sandbox.</p>
+  <p class="small">Deterministic RNG (mulberry32) seeded per panel for
+  reproducibility. No external libraries, no network calls, no analytics, no
+  storage. License: MIT (code) / CC-BY-4.0 (text). See README and DISCLOSURE.md.</p>
+</footer>
+
+</div>
+
+<script>
+"use strict";
+/* ===================== math core (real computation) ===================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function randn(rng){let u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function norm(v){let s=0;for(const x of v)s+=x*x;return Math.sqrt(s)}
+function normalize(v){const n=norm(v)||1;return v.map(x=>x/n)}
+function dot(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}
+function zeros2(r,c){const M=new Array(r);for(let i=0;i<r;i++)M[i]=new Float64Array(c);return M}
+
+/* Build N keys in R^d with target pairwise correlation rho (0..~0.95).
+   k_i = normalize( sqrt(1-rho)*g_i + sqrt(rho)*base ), base fixed unit vector. */
+function makeKeys(N,d,rho,rng){
+  const base=normalize(Array.from({length:d},()=>randn(rng)));
+  const a=Math.sqrt(Math.max(0,1-rho)), b=Math.sqrt(Math.max(0,rho));
+  const K=[];
+  for(let i=0;i<N;i++){
+    const g=Array.from({length:d},()=>randn(rng));
+    const gn=normalize(g);
+    K.push(normalize(gn.map((x,j)=>a*x+b*base[j])));
+  }
+  return K;
+}
+function makeValues(N,m,rng,unit){
+  const V=[];
+  for(let i=0;i<N;i++){
+    const g=Array.from({length:m},()=>randn(rng));
+    V.push(unit?normalize(g):g.map(x=>x/Math.sqrt(m)));
+  }
+  return V;
+}
+/* Build state S (d x m). lambda decay. delta = use delta rule (beta=1). */
+function buildState(K,V,lambda,delta,dHint,mHint){
+  if(!K.length||!V.length)return zeros2(dHint||1,mHint||1);
+  const d=K[0].length, m=V[0].length, S=zeros2(d,m);
+  for(let i=0;i<K.length;i++){
+    if(lambda!==1){for(let r=0;r<d;r++)for(let c=0;c<m;c++)S[r][c]*=lambda;}
+    let w=V[i];
+    if(delta){
+      const pred=readState(S,K[i]);            // current guess for this key
+      w=V[i].map((x,c)=>x-pred[c]);            // write only the correction
+    }
+    const k=K[i];
+    for(let r=0;r<d;r++){const kr=k[r];if(kr!==0)for(let c=0;c<m;c++)S[r][c]+=kr*w[c];}
+  }
+  return S;
+}
+function readState(S,q){
+  const d=S.length, m=S[0].length, out=new Float64Array(m);
+  for(let r=0;r<d;r++){const qr=q[r];if(qr!==0)for(let c=0;c<m;c++)out[c]+=qr*S[r][c];}
+  return out;
+}
+/* crosstalk contribution for probe index p: sum_{j!=p} (k_p . k_j) v_j  (lambda=1 model) */
+function crosstalkVec(K,V,p){
+  const m=V[0].length,out=new Float64Array(m);
+  for(let j=0;j<K.length;j++){if(j===p)continue;const c=dot(K[p],K[j]);for(let t=0;t<m;t++)out[t]+=c*V[j][t];}
+  return out;
+}
+function rmse(a,b){let s=0;for(let i=0;i<a.length;i++){const e=a[i]-b[i];s+=e*e;}return Math.sqrt(s/a.length)}
+function l2(a,b){let s=0;for(let i=0;i<a.length;i++){const e=a[i]-(b?b[i]:0);s+=e*e;}return Math.sqrt(s)}
+function predictedError(N,d,rho){return Math.sqrt(Math.max(0,(N-1)*(rho*rho+(1-rho*rho)/d)))}
+
+/* ===================== drawing helpers ===================== */
+function dpiFix(cv){const r=window.devicePixelRatio||1;const w=cv.width,h=cv.height;
+  if(cv._done)return cv.getContext('2d');
+  cv.style.width=w+'px';cv.style.height=h+'px';cv.width=w*r;cv.height=h*r;
+  const ctx=cv.getContext('2d');ctx.scale(r,r);cv._done=true;cv._w=w;cv._h=h;return ctx;}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function clr(){return{ink:css('--ink'),muted:css('--muted'),acc:css('--accent'),warn:css('--warn'),
+  truth:css('--truth'),est:css('--estimate'),cross:css('--crosstalk'),line:css('--line'),
+  panel:css('--panel'),grid:css('--grid')}}
+function drawHeat(cv,S,title){
+  const ctx=dpiFix(cv),W=cv._w,H=cv._h;const c=clr();
+  ctx.clearRect(0,0,W,H);
+  const d=S.length,m=(S[0]&&S[0].length)||0;
+  if(!d||!m){ if(title){ctx.fillStyle=c.muted;ctx.font='12px '+css('--mono');ctx.fillText(title,6,15);} return; }
+  let mx=1e-9;
+  for(let r=0;r<d;r++)for(let cc=0;cc<m;cc++)mx=Math.max(mx,Math.abs(S[r][cc]));
+  const pad=title?24:6, cw=(W-12)/m, ch=(H-pad-6)/d;
+  for(let r=0;r<d;r++)for(let cc=0;cc<m;cc++){
+    const v=S[r][cc]/mx;
+    if(v>=0)ctx.fillStyle=`rgba(47,111,79,${Math.min(1,Math.abs(v))*.92+.04})`;
+    else ctx.fillStyle=`rgba(180,69,31,${Math.min(1,Math.abs(v))*.92+.04})`;
+    ctx.fillRect(6+cc*cw,pad+r*ch,cw-1,ch-1);
+  }
+  if(title){ctx.fillStyle=c.muted;ctx.font='12px '+css('--mono');ctx.fillText(title,6,15);}
+}
+function drawBars(cv,truth,est,cross,opts){
+  opts=opts||{};
+  const ctx=dpiFix(cv),W=cv._w,H=cv._h;const c=clr();
+  ctx.clearRect(0,0,W,H);
+  const m=truth.length, pad=28, bw=(W-2*pad)/m, mid=H/2;
+  let mx=1e-6;for(let i=0;i<m;i++){mx=Math.max(mx,Math.abs(truth[i]),Math.abs(est[i]));}
+  mx*=1.15;
+  ctx.strokeStyle=c.line;ctx.beginPath();ctx.moveTo(pad,mid);ctx.lineTo(W-pad,mid);ctx.stroke();
+  for(let i=0;i<m;i++){
+    const x=pad+i*bw;
+    const th=truth[i]/mx*(mid-14), eh=est[i]/mx*(mid-14);
+    ctx.fillStyle=c.truth;ctx.globalAlpha=.55;ctx.fillRect(x+2,mid-Math.max(0,th),bw*0.42,Math.abs(th));
+    ctx.fillStyle=c.truth;ctx.fillRect(x+2,mid-Math.min(0,th),bw*0.42,Math.abs(Math.min(0,th)));
+    ctx.globalAlpha=1;
+    ctx.fillStyle=c.est;ctx.fillRect(x+2+bw*0.46,mid-Math.max(0,eh),bw*0.42,Math.abs(eh));
+    ctx.fillRect(x+2+bw*0.46,mid-Math.min(0,eh),bw*0.42,Math.abs(Math.min(0,eh)));
+  }
+  ctx.fillStyle=c.muted;ctx.font='11px '+css('--mono');
+  ctx.fillText('value vector components  ('+m+')  — bar pairs: true | returned',pad,H-8);
+}
+function drawGauge(cv,measured,predicted,label){
+  const ctx=dpiFix(cv),W=cv._w,H=cv._h;const c=clr();
+  ctx.clearRect(0,0,W,H);
+  const x0=16,x1=W-16,y=H-40, scale=Math.max(measured,predicted,0.4)*1.25;
+  ctx.strokeStyle=c.line;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
+  const px=x=>x0+(x/scale)*(x1-x0);
+  ctx.fillStyle=c.truth;ctx.fillRect(px(0),y-30,Math.max(1,px(predicted)-px(0)),12);
+  ctx.fillStyle=c.est;ctx.fillRect(px(0),y-14,Math.max(1,px(measured)-px(0)),12);
+  ctx.fillStyle=c.muted;ctx.font='12px '+css('--mono');
+  ctx.fillText('predicted √law  '+predicted.toFixed(3),px(0),y-34);
+  ctx.fillText('measured         '+measured.toFixed(3),px(0),y+18);
+  if(label){ctx.fillStyle=c.ink;ctx.fillText(label,x0,18);}
+}
+function axes(ctx,W,H,pad,xr,yr,xlab,ylab){
+  const c=clr();ctx.strokeStyle=c.line;ctx.fillStyle=c.muted;ctx.font='11px '+css('--mono');
+  ctx.beginPath();ctx.moveTo(pad,H-pad);ctx.lineTo(W-8,H-pad);ctx.moveTo(pad,H-pad);ctx.lineTo(pad,8);ctx.stroke();
+  for(let g=0;g<=4;g++){
+    const gx=pad+g/4*(W-pad-8), gy=H-pad-g/4*(H-pad-8);
+    ctx.strokeStyle=c.grid;ctx.beginPath();ctx.moveTo(pad,gy);ctx.lineTo(W-8,gy);ctx.stroke();
+    ctx.fillStyle=c.muted;
+    ctx.fillText((xr[0]+g/4*(xr[1]-xr[0])).toFixed(xr[1]>10?0:2),gx-6,H-pad+14);
+    ctx.fillText((yr[0]+g/4*(yr[1]-yr[0])).toFixed(2),4,gy+3);
+  }
+  ctx.fillStyle=c.ink;ctx.fillText(xlab,W/2-30,H-4);
+  ctx.save();ctx.translate(10,H/2+30);ctx.rotate(-Math.PI/2);ctx.fillText(ylab,0,0);ctx.restore();
+}
+
+/* ===================== 0 · hero demo ===================== */
+(function(){
+  const heat=document.getElementById('heroHeat'), bars=document.getElementById('heroBars');
+  const stat=document.getElementById('heroStat'), play=document.getElementById('heroPlay'),
+        reseed=document.getElementById('heroReseed');
+  let seed=7, N=20, d=64, m=10, step=1, running=true, K,V;
+  const RHO=0.04;
+  function build(){const rng=mulberry32(seed);K=makeKeys(N,d,RHO,rng);V=makeValues(N,m,rng,true);}
+  build();
+  function frame(){
+    const Kc=K.slice(0,step), Vc=V.slice(0,step);
+    const S=buildState(Kc,Vc,1,false,d,m);
+    drawHeat(heat,S,'memory S  ('+d+'×'+m+')   after '+step+' / '+N+' writes');
+    const p=Math.min(1,step-1);
+    const est=readState(S,K[p]);
+    drawBars(bars,V[p],est,null);
+    const err=l2(est,V[p]), pred=predictedError(step,d,RHO);
+    const tag = err<0.25?'sharp':(err<0.6?'blurring':'buried');
+    stat.innerHTML=`fact <b>#${p+1}</b> is <b>${tag}</b> &nbsp; recall error <b style="color:${clr().est}">${err.toFixed(3)}</b> &nbsp; √law ≈ <b style="color:${clr().truth}">${pred.toFixed(3)}</b>`;
+    if(running){step++;if(step>N)step=1;}
+  }
+  frame();
+  let t=setInterval(frame,650);
+  play.onclick=()=>{running=!running;play.textContent=running?'Pause':'Play';};
+  reseed.onclick=()=>{seed=(seed*1103515245+12345)>>>0;step=1;build();frame();};
+})();
+
+/* ===================== 1 · write walkthrough ===================== */
+(function(){
+  const heat=document.getElementById('wHeat'), outer=document.getElementById('wOuter'),
+        cap=document.getElementById('wCaption');
+  const bStep=document.getElementById('wStep'), bPlay=document.getElementById('wPlay'), bReset=document.getElementById('wReset');
+  const seed=42, N=20, d=16, m=10;
+  const rng=mulberry32(seed), K=makeKeys(N,d,0.1,rng), V=makeValues(N,m,rng,true);
+  let step=0, timer=null;
+  function render(){
+    const S=buildState(K.slice(0,step),V.slice(0,step),1,false,d,m);
+    drawHeat(heat,S,'S after '+step+' writes');
+    if(step>0){
+      const O=zeros2(d,m);const k=K[step-1],v=V[step-1];
+      for(let r=0;r<d;r++)for(let c=0;c<m;c++)O[r][c]=k[r]*v[c];
+      drawHeat(outer,O,'this step:  k'+step+' v'+step+'ᵀ');
+      cap.innerHTML=`Write ${step}/${N}: added the rank-1 matrix <code>k${step} v${step}ᵀ</code> into S. Every entry of S changed a little.`;
+    } else {drawHeat(outer,zeros2(d,m),'(nothing yet)');cap.textContent='Memory is empty. Press Write next.';}
+  }
+  render();
+  bStep.onclick=()=>{if(step<N){step++;render();}};
+  bReset.onclick=()=>{step=0;render();if(timer){clearInterval(timer);timer=null;bPlay.textContent='Play';}};
+  bPlay.onclick=()=>{
+    if(timer){clearInterval(timer);timer=null;bPlay.textContent='Play';return;}
+    bPlay.textContent='Pause';
+    timer=setInterval(()=>{if(step<N){step++;render();}else{clearInterval(timer);timer=null;bPlay.textContent='Play';}},420);
+  };
+})();
+
+/* ===================== 2 · read decomposition ===================== */
+(function(){
+  const el=id=>document.getElementById(id);
+  const rN=el('rN'),rD=el('rD'),rRho=el('rRho'),rProbe=el('rProbe'),rDelta=el('rDelta');
+  const bars=el('rBars'),gauge=el('rGauge'),stat=el('rStat'),note=el('rNote');
+  const m=12, seed=123;
+  function upd(){
+    const N=+rN.value,d=+rD.value,rho=+rRho.value/100;
+    rProbe.max=N; if(+rProbe.value>N)rProbe.value=N;
+    const p=(+rProbe.value)-1;
+    el('rNv').textContent=N;el('rDv').textContent=d;el('rRhov').textContent=rho.toFixed(2);el('rProbev').textContent=p+1;
+    const rng=mulberry32(seed);
+    const K=makeKeys(N,d,rho,rng), V=makeValues(N,m,rng,true);
+    const S=buildState(K,V,1,rDelta.checked);
+    const est=readState(S,K[p]);
+    const ct=crosstalkVec(K,V,p);
+    drawBars(bars,V[p],est,ct);
+    const measured=l2(est,V[p]);
+    const pred=predictedError(N,d,rho);
+    drawGauge(gauge,measured,pred,'probe #'+(p+1)+'   (N='+N+', d='+d+', ρ='+rho.toFixed(2)+')');
+    const ctn=norm(ct);
+    stat.innerHTML=`‖signal‖ = <b>1.000</b> &nbsp; ‖cross-talk‖ = <b style="color:${clr().cross}">${ctn.toFixed(3)}</b> &nbsp; recall error = <b style="color:${clr().est}">${measured.toFixed(3)}</b>`;
+    let verdict;
+    if(measured<0.25)verdict='Sharp recall: keys are near-orthogonal, so cross-talk stays small.';
+    else if(measured<0.6)verdict='Blurring: other values are visibly bleeding into the answer.';
+    else verdict='Buried: the true value is lost under cross-talk. This is the capacity wall.';
+    note.innerHTML=verdict+(rDelta.checked?' <i>(delta rule active — it subtracts the current prediction before writing, cutting interference for repeated/similar keys.)</i>':'');
+  }
+  [rN,rD,rRho,rProbe].forEach(x=>x.addEventListener('input',upd));
+  rDelta.addEventListener('change',upd);
+  upd();
+})();
+
+/* ===================== 3 · the sqrt law plot ===================== */
+(function(){
+  const el=id=>document.getElementById(id);
+  const lawVar=el('lawVar'),lRho=el('lRho'),lTrial=el('lTrial'),plot=el('lawPlot'),note=el('lawNote');
+  const m=10;
+  function measureError(N,d,rho,trials){
+    let acc=0;
+    for(let t=0;t<trials;t++){
+      const rng=mulberry32(1000+t*7+N*13+d*101);
+      const K=makeKeys(N,d,rho,rng),V=makeValues(N,m,rng,true);
+      const S=buildState(K,V,1,false);
+      const p=Math.floor(rng()*N);
+      acc+=l2(readState(S,K[p]),V[p]);
+    }
+    return acc/trials;
+  }
+  function upd(){
+    const rho=+lRho.value/100, trials=+lTrial.value, mode=lawVar.value;
+    el('lRhov').textContent=rho.toFixed(2);el('lTrialv').textContent=trials;
+    const ctx=dpiFix(plot),W=plot._w,H=plot._h,pad=44;const c=clr();
+    ctx.clearRect(0,0,W,H);
+    const pts=[]; let xr,xlab;
+    if(mode==='N'){ xr=[2,60]; xlab='N  (bindings stored),  d = 40';
+      for(let N=2;N<=60;N+=2)pts.push([N,measureError(N,40,rho,trials),predictedError(N,40,rho)]);
+    } else { xr=[4,120]; xlab='d  (key dimension),  N = 30';
+      for(let d=4;d<=120;d+=4)pts.push([d,measureError(30,d,rho,trials),predictedError(30,d,rho)]);
+    }
+    let ymx=0;pts.forEach(p=>ymx=Math.max(ymx,p[1],p[2]));ymx*=1.2;
+    axes(ctx,W,H,pad,xr,[0,ymx],xlab,'RMS recall error  (L2)');
+    const X=v=>pad+(v-xr[0])/(xr[1]-xr[0])*(W-pad-8);
+    const Y=v=>H-pad-v/ymx*(H-pad-8);
+    ctx.strokeStyle=c.truth;ctx.lineWidth=2;ctx.beginPath();
+    pts.forEach((p,i)=>{i?ctx.lineTo(X(p[0]),Y(p[2])):ctx.moveTo(X(p[0]),Y(p[2]));});ctx.stroke();
+    ctx.fillStyle=c.est;
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),3,0,7);ctx.fill();});
+    const dev=pts.reduce((a,p)=>a+Math.abs(p[1]-p[2]),0)/pts.length;
+    note.innerHTML=rho<0.02
+      ? `Mean |measured − predicted| = <b>${dev.toFixed(3)}</b>. The dots sit on the line: the √(N/d) law holds for random keys.`
+      : `ρ = ${rho.toFixed(2)}: measured error (dots) now rides <b>above</b> the ρ-aware line by ${dev.toFixed(3)} on average — correlation adds a floor that raising d cannot remove.`;
+  }
+  [lawVar,lRho,lTrial].forEach(x=>x.addEventListener('input',upd));
+  upd();
+})();
+
+/* ===================== 4 · forgetting: interference vs decay ===================== */
+(function(){
+  const el=id=>document.getElementById(id);
+  const fLam=el('fLam'),fN=el('fN'),fD=el('fD'),plot=el('forgetPlot'),note=el('forgetNote');
+  const m=10, trials=30;
+  function upd(){
+    const lam=+fLam.value/1000, N=+fN.value, d=+fD.value;
+    el('fLamv').textContent=lam.toFixed(3);el('fNv').textContent=N;el('fDv').textContent=d;
+    const byAge=new Float64Array(N);
+    for(let t=0;t<trials;t++){
+      const rng=mulberry32(555+t*17+N+d*7);
+      const K=makeKeys(N,d,0.05,rng),V=makeValues(N,m,rng,true);
+      const S=buildState(K,V,lam,false);
+      for(let i=0;i<N;i++){
+        // effective stored value at read time (decay applied after write i): lam^(N-1-i)
+        const eff=V[i].map(x=>x*Math.pow(lam,N-1-i));
+        byAge[N-1-i]+=l2(readState(S,K[i]),eff);
+      }
+    }
+    for(let i=0;i<N;i++)byAge[i]/=trials;
+    const ctx=dpiFix(plot),W=plot._w,H=plot._h,pad=44;const c=clr();
+    ctx.clearRect(0,0,W,H);
+    let ymx=0;for(const v of byAge)ymx=Math.max(ymx,v);ymx*=1.2||1;
+    axes(ctx,W,H,pad,[0,N-1],[0,ymx],'binding age  (0 = most recently written)','recall error');
+    const X=v=>pad+v/(N-1)*(W-pad-8), Y=v=>H-pad-v/ymx*(H-pad-8);
+    ctx.strokeStyle=c.est;ctx.lineWidth=2;ctx.beginPath();
+    byAge.forEach((v,i)=>{i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v));});ctx.stroke();
+    ctx.fillStyle=c.est;byAge.forEach((v,i)=>{ctx.beginPath();ctx.arc(X(i),Y(v),2.5,0,7);ctx.fill();});
+    const flat=Math.abs(byAge[0]-byAge[N-1])/(ymx||1);
+    note.innerHTML=lam>0.999
+      ? `λ = 1.000: the curve is roughly flat — <b>interference hits every binding about equally</b>, new and old.`
+      : `λ = ${lam.toFixed(3)}: the curve tilts — recent bindings (left) stay sharp, old ones (right) are <b>decayed away</b>. Recency bought, history sold.`;
+  }
+  [fLam,fN,fD].forEach(x=>x.addEventListener('input',upd));
+  upd();
+})();
+
+/* ===================== 5 · softmax vs linear ===================== */
+(function(){
+  const el=id=>document.getElementById(id);
+  const aTgt=el('aTgt'),aRho=el('aRho'),aPhi=el('aPhi'),soft=el('aSoft'),lin=el('aLin'),note=el('aNote');
+  const N=6,d=16,m=8,seed=99;
+  function phi(x,kind){
+    if(kind==='id')return x.slice();
+    if(kind==='elu')return x.map(v=>v>0?v+1:Math.exp(v));
+    return x.map(v=>v>0?v:0);
+  }
+  function bar(cv,vals,labels,color,title){
+    const ctx=dpiFix(cv),W=cv._w,H=cv._h;const c=clr();
+    ctx.clearRect(0,0,W,H);
+    const pad=30,bw=(W-2*pad)/vals.length;let mx=1e-6;vals.forEach(v=>mx=Math.max(mx,Math.abs(v)));mx*=1.15;
+    ctx.fillStyle=c.muted;ctx.font='12px '+css('--mono');ctx.fillText(title,pad,16);
+    vals.forEach((v,i)=>{
+      const x=pad+i*bw, h=v/mx*(H-70);
+      ctx.fillStyle=v>=0?color:c.warn;
+      ctx.fillRect(x+3,H-34-Math.max(0,h),bw-8,Math.abs(h));
+      ctx.fillStyle=c.muted;ctx.fillText(labels[i],x+bw/2-14,H-14);
+    });
+  }
+  function upd(){
+    const tgt=(+aTgt.value)-1, rho=+aRho.value/100, kind=aPhi.value;
+    el('aTgtv').textContent=tgt+1;el('aRhov').textContent=rho.toFixed(2);
+    const rng=mulberry32(seed);
+    const K=makeKeys(N,d,rho,rng), V=makeValues(N,m,rng,true);
+    const q=K[tgt];
+    const logits=K.map(k=>dot(q,k)*4);       // temperature so softmax can concentrate
+    const mxl=Math.max(...logits);
+    const ex=logits.map(l=>Math.exp(l-mxl));const Z=ex.reduce((a,b)=>a+b,0);
+    const sm=ex.map(e=>e/Z);
+    const pq=phi(q,kind);
+    const contrib=K.map(k=>dot(pq,phi(k,kind)));
+    const cs=contrib.reduce((a,b)=>a+Math.abs(b),0)||1;
+    bar(soft,sm,sm.map((_,i)=>'b'+(i+1)),clr().acc,'softmax weight on each binding');
+    bar(lin,contrib.map(v=>v/cs),contrib.map((_,i)=>'b'+(i+1)),clr().acc,'linear φ(q)·φ(kⱼ), normalised');
+    const purity=sm[tgt], linPurity=Math.abs(contrib[tgt])/cs;
+    note.innerHTML=`Weight on the true match — softmax: <b>${(purity*100).toFixed(0)}%</b> vs linear: <b>${(linPurity*100).toFixed(0)}%</b>. `+
+      (kind==='relu'?'With relu φ, non-target contributions are frequently exactly 0 — sparse, non-negative, the BDH regime.':
+       'Softmax concentrates; the linear read leaves a tail on the other bindings. That tail is the cross-talk.');
+  }
+  [aTgt,aRho,aPhi].forEach(x=>x.addEventListener('input',upd));
+  upd();
+})();
+
+/* ===================== sandbox ===================== */
+(function(){
+  const el=id=>document.getElementById(id);
+  const ids=['sN','sD','sM','sRho','sLam','sProbe'];
+  const sDelta=el('sDelta'),sNormV=el('sNormV');
+  function upd(){
+    const N=+el('sN').value,d=+el('sD').value,m=+el('sM').value,rho=+el('sRho').value/100,lam=+el('sLam').value/1000;
+    el('sProbe').max=N;if(+el('sProbe').value>N)el('sProbe').value=N;
+    const p=(+el('sProbe').value)-1;
+    el('sNv').textContent=N;el('sDv').textContent=d;el('sMv').textContent=m;
+    el('sRhov').textContent=rho.toFixed(2);el('sLamv').textContent=lam.toFixed(3);el('sProbev').textContent=p+1;
+    el('sDim').textContent=d+' × '+m+'  =  '+(d*m)+' numbers, fixed';
+    const rng=mulberry32(2024);
+    const K=makeKeys(N,d,rho,rng), V=makeValues(N,m,rng,sNormV.checked);
+    const S=buildState(K,V,lam,sDelta.checked);
+    drawHeat(el('sHeat'),S,'S');
+    const eff=V[p].map(x=>x*Math.pow(lam,N-1-p));
+    const est=readState(S,K[p]);
+    drawBars(el('sBars'),eff,est,null);
+    const measured=l2(est,eff), pred=predictedError(N,d,rho);
+    el('sStat').innerHTML=`recall error <b style="color:${clr().est}">${measured.toFixed(3)}</b> &nbsp; √law(ρ) <b style="color:${clr().truth}">${pred.toFixed(3)}</b> &nbsp; ratio N/d = <b>${(N/d).toFixed(2)}</b>`;
+    let v;
+    if(measured<0.25)v='✓ Recall is sharp. You are inside the interference budget.';
+    else if(measured<0.6)v='~ Recall blurring. Raise d, lower N, lower ρ, or turn on the delta rule.';
+    else v='✗ Over budget. The true value is lost in cross-talk — exactly what the claim predicts.';
+    el('sVerdict').textContent=v;
+  }
+  ids.forEach(i=>el(i).addEventListener('input',upd));
+  [sDelta,sNormV].forEach(x=>x.addEventListener('change',upd));
+  upd();
+})();
+
+/* ===================== theme toggle ===================== */
+(function(){
+  const btn=document.getElementById('themebtn');
+  btn.onclick=()=>{
+    const cur=document.documentElement.getAttribute('data-theme');
+    const next=cur==='dark'?'light':(cur==='light'?'dark':(matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark'));
+    document.documentElement.setAttribute('data-theme',next);
+    // repaint canvases that cache context scaling is fine; trigger input events
+    document.querySelectorAll('input[type=range]').forEach(r=>r.dispatchEvent(new Event('input')));
+  };
+})();
+</script>
+</body>
+</html>
