@@ -20,8 +20,8 @@ control exists so a learner can try to break it.
 |---|---|
 | Public artifact (opens without sign-in) | https://dataforgepathway.netlify.app/ |
 | Source repository | https://github.com/banavathsrikanth7/Dataforge-26|
-| One-page concept summary (PDF) | [`one-page-summary.pdf`](one-page-summary.pdf) |
-| Blog (PDF) | [`blog.pdf`](blog.pdf) |
+| One-page concept summary (PDF) | https://github.com/banavathsrikanth7/Dataforge-26/blob/main/one-page-summary.pdf |
+| Blog (PDF) | https://github.com/banavathsrikanth7/Dataforge-26/blob/main/blog.pdf|
 
 ---
 
