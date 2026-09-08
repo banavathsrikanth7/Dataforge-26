@@ -2,7 +2,10 @@
 
 ## Team
 
-Vijan · Sai Keerthana · Jagadeesh · Srikanth. No mentors.
+- Vijan
+- Sai Keerthana
+- Jagadeesh
+- Srikanth
 
 ## AI assistance
 

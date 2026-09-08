@@ -37,8 +37,6 @@ submission: the equations, the JavaScript, every control's mapping to a concept
 variable, and every citation. AI assistance is disclosed in
 [`DISCLOSURE.md`](DISCLOSURE.md).
 
-Mentors: none.
-
 ---
 
 ## The claim, the audience, the objectives
