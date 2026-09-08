@@ -1,5 +1,9 @@
 # AI assistance, code, data, asset and license disclosure
 
+## Team
+
+Vijan · Sai Keerthana · Jagadeesh · Srikanth. No mentors.
+
 ## AI assistance
 
 The initial scaffold of this submission was produced with AI assistance
@@ -21,9 +25,9 @@ a Pathway scaling-law claim, re-sourced and re-labelled), the Sudoku result
 (re-sourced from the paper to Pathway's research post, with the 97.4% figure
 added), and a "sparsity varies with predictability" clause (unverified, removed).
 
-The registered team is responsible for understanding and defending every
-component: the equations, the JavaScript, every control's mapping to a concept
-variable, and every citation.
+The registered team — Vijan, Sai Keerthana, Jagadeesh, Srikanth — is responsible
+for understanding and defending every component: the equations, the JavaScript,
+every control's mapping to a concept variable, and every citation.
 
 ## Code
 

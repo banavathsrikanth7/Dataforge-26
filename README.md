@@ -21,7 +21,23 @@ control exists so a learner can try to break it.
 | Public artifact (opens without sign-in) | https://dataforgepathway.netlify.app/ |
 | Source repository | https://github.com/banavathsrikanth7/Dataforge-26|
 | One-page concept summary (PDF) | https://github.com/banavathsrikanth7/Dataforge-26/blob/main/one-page-summary.pdf |
-| Blog (PDF) | https://github.com/banavathsrikanth7/Dataforge-26/blob/main/blog.pdf|
+| Blog (PDF) | https://github.com/banavathsrikanth7/Dataforge-26/blob/main/blog.pdf |
+
+---
+
+## Team
+
+- **Vijan**
+- **Sai Keerthana**
+- **Jagadeesh**
+- **Srikanth**
+
+The registered team built, understands, and defends every component of this
+submission: the equations, the JavaScript, every control's mapping to a concept
+variable, and every citation. AI assistance is disclosed in
+[`DISCLOSURE.md`](DISCLOSURE.md).
+
+Mentors: none.
 
 ---
 
@@ -228,11 +244,13 @@ No datasets, no model weights, no third-party media are bundled or downloaded.
 
 See [`DISCLOSURE.md`](DISCLOSURE.md). Summary: this scaffold — the `index.html`
 structure and JavaScript, `README.md`, `one-page-summary.md`, and `blog.md` — was
-drafted with AI assistance (Claude, Anthropic). The registered team is responsible
-for verifying the mathematics (done: the `√(N/d)` law is checked against live
-Monte-Carlo in §3 and against the NumPy snippet above), verifying every BDH/BDH-CQ
-claim against primary sources (**pending — see markers**), and being able to explain
-and defend every equation, control, and citation in a live review.
+drafted with AI assistance (Claude, Anthropic). The registered team (Vijan, Sai
+Keerthana, Jagadeesh, Srikanth) is responsible for the mathematics (verified: the
+`√(N/d)` law is checked against live Monte-Carlo in §3 and against the NumPy snippet
+above), the BDH/BDH-CQ claims (verified against arXiv:2509.26507, arXiv:2608.09888,
+Pathway's Sudoku research post, and AWS's write-up — cited with section numbers in
+§6), and being able to explain and defend every equation, control, and citation in
+a live review.
 
 ---
 
